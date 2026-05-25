@@ -35,6 +35,22 @@ function lineFromNode(node: Node, attr: "data-src-start" | "data-src-end"): numb
   return value ? Number(value) : undefined;
 }
 
+/**
+ * Source line range covered by a live range, read from the rendered DOM stamps.
+ * A boundary can land on inter-block whitespace (MDX emits "\n" text nodes whose
+ * parent is the article, with no line stamp), so each side falls back to the
+ * other boundary when its own lookup misses.
+ */
+export function sourceLinesForRange(range: Range): { start?: number; end?: number } {
+  const start =
+    lineFromNode(range.startContainer, "data-src-start") ??
+    lineFromNode(range.endContainer, "data-src-start");
+  const end =
+    lineFromNode(range.endContainer, "data-src-end") ??
+    lineFromNode(range.startContainer, "data-src-end");
+  return { start, end };
+}
+
 /** Build a persistent anchor from a live selection range. */
 export function captureAnchor(root: HTMLElement, range: Range): Anchor {
   const full = root.textContent ?? "";

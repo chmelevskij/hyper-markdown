@@ -19,6 +19,10 @@ agent can act on your review precisely.
   comments re-anchor to the current document by their quoted text.
 - **Reading / Comment modes** — toggle between a plain themed reader and the full
   highlight-and-annotate experience (with a resizable comment sidebar).
+- **Addressed tracking** — each comment snapshots the source it was made against;
+  when the document changes, comments are flagged **untouched / edited / removed**,
+  with a before→after diff and a one-click "Resolve as addressed". A "Needs review"
+  filter surfaces just the comments whose text your edits touched.
 - **Neobrutalist Solarized theme** — one cohesive theme with light & dark modes.
 - **Safe mode** — render MDX as plain Markdown (no code execution) for untrusted files.
 - **Persistent comments** — saved to a sidecar `*.hmd-comments.json` next to the document.

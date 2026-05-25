@@ -106,6 +106,12 @@ interface Comment {
     sourceLineStart?: number;
     sourceLineEnd?: number;
   };
+  baseline?: {                        // snapshot for addressed-tracking (Phase 7)
+    docHash: string;                  // hash of full source when commented
+    sourceText: string;               // anchored source slice at that time
+    lineStart?: number; lineEnd?: number;
+    capturedAt: string;
+  };
 }
 ```
 
@@ -174,9 +180,16 @@ MDX executes arbitrary JS/JSX, so an opened `.mdx` file is effectively code.
       theme (light/dark), Reading/Comment mode toggle, app packaging
       (`pnpm tauri build` → `.app` + `.dmg`), resizable comment sidebar (width persisted,
       clamped 260–620), `scrollbar-gutter: stable` to stop scrollbar-induced layout shift.
-- [ ] **Remaining polish.** External-edit live reload, more keyboard shortcuts,
-      jump-to-highlight scroll, "unanchored" badge for imported comments whose quote isn't
-      found, strict CSP.
+- [x] **Phase 7 — Addressed tracking.** Each comment snapshots a `baseline`
+      (doc hash + anchored source slice) in the sidecar (bumped to `version: 2`). On
+      every render the rendered DOM + current source are compared to classify each
+      comment **untouched / edited / removed** (operating on *source* slices, so it is
+      identical for Markdown and MDX). Sidebar shows a per-comment badge, a "Needs
+      review" filter + count, a before→after diff, and a "Resolve as addressed" action
+      that re-baselines to the current source.
+- [ ] **Remaining polish.** External-edit live reload (pairs with addressed tracking:
+      reclassify on reload), more keyboard shortcuts, jump-to-highlight scroll,
+      "unanchored" badge for imported comments whose quote isn't found, strict CSP.
 
 ### Verified (browser preview, Chrome DevTools MCP)
 Render pipeline (frontmatter, GFM task lists, tables, math), Mermaid SVG, Shiki highlighting,

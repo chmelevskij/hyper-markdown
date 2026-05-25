@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore, HIGHLIGHT_COLORS } from "../store/useStore";
-import { captureAnchor, resolveRange } from "../lib/anchor";
-import type { Anchor } from "../types";
+import { captureAnchor, resolveRange, sourceLinesForRange } from "../lib/anchor";
+import { hashSource, normalizeForCompare, sliceSourceLines } from "../lib/changes";
+import type { Anchor, CommentChange } from "../types";
 import MdxRenderer from "./MdxRenderer";
 import SelectionPopover from "./SelectionPopover";
 
@@ -21,6 +22,7 @@ export default function DocumentView() {
   const renderNonce = useStore((s) => s.renderNonce);
   const addComment = useStore((s) => s.addComment);
   const selectComment = useStore((s) => s.selectComment);
+  const setChanges = useStore((s) => s.setChanges);
 
   const reading = viewMode === "reading";
   const rootRef = useRef<HTMLDivElement>(null);
@@ -52,9 +54,44 @@ export default function DocumentView() {
     CSS.highlights.set("hmd-active", active);
   }, [comments, selectedId, reading]);
 
+  // Classify each comment against its baseline: untouched / edited / removed.
+  const classify = useCallback(() => {
+    const root = rootRef.current;
+    if (!root || !doc) return;
+    const source = doc.source;
+    const curHash = hashSource(source);
+    const map: Record<string, CommentChange> = {};
+    for (const c of comments) {
+      const b = c.baseline;
+      if (!b) continue; // no baseline (e.g. imported) → no badge
+      if (b.docHash === curHash) {
+        map[c.id] = { state: "untouched" };
+        continue;
+      }
+      const range = resolveRange(root, c.anchor);
+      if (!range) {
+        map[c.id] =
+          b.sourceText && source.includes(b.sourceText)
+            ? { state: "untouched" }
+            : { state: "removed", wasText: b.sourceText };
+        continue;
+      }
+      const { start, end } = sourceLinesForRange(range);
+      const nowText =
+        start != null ? sliceSourceLines(source, start, end ?? start) : range.toString();
+      const wasText = b.sourceText ?? "";
+      map[c.id] =
+        normalizeForCompare(nowText) === normalizeForCompare(wasText)
+          ? { state: "untouched" }
+          : { state: "edited", wasText, nowText };
+    }
+    setChanges(map);
+  }, [comments, doc, setChanges]);
+
   useEffect(() => {
     paintHighlights();
-  }, [paintHighlights, renderNonce]);
+    classify();
+  }, [paintHighlights, classify, renderNonce]);
 
   useEffect(() => () => {
     if (supportsHighlights) CSS.highlights.clear();
@@ -107,8 +144,11 @@ export default function DocumentView() {
       addComment(pending.anchor, body.trim());
       window.getSelection()?.removeAllRanges();
       setPending(null);
-      // Repaint after state settles.
-      requestAnimationFrame(paintHighlights);
+      // Repaint + reclassify after state settles.
+      requestAnimationFrame(() => {
+        paintHighlights();
+        classify();
+      });
     }
   };
 
@@ -126,7 +166,12 @@ export default function DocumentView() {
           source={doc.source}
           format={safeMode ? "md" : doc.format}
           nonce={renderNonce}
-          onRendered={() => requestAnimationFrame(paintHighlights)}
+          onRendered={() =>
+            requestAnimationFrame(() => {
+              paintHighlights();
+              classify();
+            })
+          }
         />
       </article>
       {pending && (

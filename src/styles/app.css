@@ -344,6 +344,66 @@ body {
 }
 .comment-card__placeholder { color: var(--muted); font-style: italic; }
 
+/* ---- Change / addressed badges ---- */
+.change-badge {
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border: 1.5px solid var(--border);
+  line-height: 1.5;
+}
+.change-badge--untouched { background: transparent; color: var(--muted); border-color: var(--quote-border); }
+.change-badge--edited { background: #cb4b16; color: #fdf6e3; }
+.change-badge--removed { background: #dc322f; color: #fdf6e3; }
+
+/* ---- Needs-review filter (reuses .seg__btn) ---- */
+.sidebar__filter {
+  display: flex;
+  height: 30px;
+  border: var(--border-w) solid var(--border);
+}
+.sidebar__filter .seg__btn { flex: 1; justify-content: center; font-size: 12px; }
+.sidebar__filter .seg__btn + .seg__btn { border-left: var(--border-w) solid var(--border); }
+
+/* ---- Before / after diff on a changed comment ---- */
+.change-diff {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1.5px dashed var(--quote-border);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.change-diff__label {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.change-diff__was,
+.change-diff__now {
+  margin: 0;
+  padding: 6px 8px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 140px;
+  overflow: auto;
+  border: 1.5px solid var(--border);
+}
+.change-diff__was {
+  background: rgba(220, 50, 47, 0.12);
+  text-decoration: line-through;
+  text-decoration-color: rgba(220, 50, 47, 0.6);
+}
+.change-diff__now { background: rgba(133, 153, 0, 0.16); }
+.change-diff__resolve { width: 100%; justify-content: center; margin-top: 4px; }
+
 /* ---- Toast ---- */
 .toast {
   position: absolute;

@@ -1,7 +1,8 @@
 import { create } from "zustand";
-import type { Anchor, Comment, CommentFile, LoadedDocument } from "../types";
+import type { Anchor, Comment, CommentChange, CommentFile, LoadedDocument } from "../types";
 import { platform } from "../platform";
 import { uid } from "../lib/id";
+import { hashSource, sliceSourceLines } from "../lib/changes";
 import type { ImportedComment } from "../lib/importComments";
 
 export type Mode = "light" | "dark";
@@ -26,6 +27,8 @@ interface AppState {
   safeMode: boolean;
   showResolved: boolean;
   sidebarWidth: number;
+  /** Per-comment change state vs. baseline (derived after each render). */
+  changes: Record<string, CommentChange>;
   /** Bumped whenever the rendered DOM changes so highlights re-resolve. */
   renderNonce: number;
 
@@ -35,8 +38,10 @@ interface AppState {
   addComment: (anchor: Anchor, body: string) => string;
   importComments: (list: ImportedComment[]) => number;
   updateComment: (id: string, patch: Partial<Pick<Comment, "body" | "status">>) => void;
+  resolveAsAddressed: (id: string) => void;
   deleteComment: (id: string) => void;
   selectComment: (id: string | null) => void;
+  setChanges: (changes: Record<string, CommentChange>) => void;
 
   setMode: (m: Mode) => void;
   setViewMode: (v: ViewMode) => void;
@@ -87,7 +92,7 @@ const clampWidth = (w: number) => Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w)
 
 async function persistComments(doc: LoadedDocument | null, comments: Comment[]) {
   if (!doc) return;
-  const file: CommentFile = { version: 1, document: doc.path, comments };
+  const file: CommentFile = { version: 2, document: doc.path, comments };
   try {
     await platform.saveComments(doc.path, JSON.stringify(file, null, 2));
   } catch (e) {
@@ -101,10 +106,11 @@ export const useStore = create<AppState>((set, get) => ({
   selectedId: null,
   ...loadPrefs(),
   showResolved: false,
+  changes: {},
   renderNonce: 0,
 
   async loadDocument(doc) {
-    set({ doc, comments: [], selectedId: null });
+    set({ doc, comments: [], selectedId: null, changes: {} });
     set((s) => ({ renderNonce: s.renderNonce + 1 }));
     // Hydrate any saved comments for this document.
     try {
@@ -128,6 +134,22 @@ export const useStore = create<AppState>((set, get) => ({
     const now = new Date().toISOString();
     const { comments, doc } = get();
     const color = HIGHLIGHT_COLORS[comments.length % HIGHLIGHT_COLORS.length];
+    const baseline = doc
+      ? {
+          docHash: hashSource(doc.source),
+          sourceText:
+            anchor.sourceLineStart != null
+              ? sliceSourceLines(
+                  doc.source,
+                  anchor.sourceLineStart,
+                  anchor.sourceLineEnd ?? anchor.sourceLineStart,
+                )
+              : anchor.quote,
+          lineStart: anchor.sourceLineStart,
+          lineEnd: anchor.sourceLineEnd,
+          capturedAt: now,
+        }
+      : undefined;
     const comment: Comment = {
       id,
       documentPath: doc?.path ?? "untitled",
@@ -137,6 +159,7 @@ export const useStore = create<AppState>((set, get) => ({
       status: "open",
       color,
       anchor,
+      baseline,
     };
     const next = [...comments, comment];
     set({ comments: next, selectedId: id });
@@ -172,6 +195,28 @@ export const useStore = create<AppState>((set, get) => ({
     persistComments(doc, next);
   },
 
+  resolveAsAddressed(id) {
+    const { comments, doc, changes } = get();
+    const now = new Date().toISOString();
+    const ch = changes[id];
+    const next = comments.map((c) => {
+      if (c.id !== id) return c;
+      // Re-baseline to the current source so a reopened comment reads "untouched".
+      const baseline =
+        doc && c.baseline
+          ? {
+              ...c.baseline,
+              docHash: hashSource(doc.source),
+              sourceText: ch?.nowText ?? c.baseline.sourceText,
+              capturedAt: now,
+            }
+          : c.baseline;
+      return { ...c, status: "resolved" as const, baseline, updatedAt: now };
+    });
+    set({ comments: next });
+    persistComments(doc, next);
+  },
+
   deleteComment(id) {
     const { comments, doc, selectedId } = get();
     const next = comments.filter((c) => c.id !== id);
@@ -181,6 +226,10 @@ export const useStore = create<AppState>((set, get) => ({
 
   selectComment(id) {
     set({ selectedId: id });
+  },
+
+  setChanges(changes) {
+    set({ changes });
   },
 
   setMode(mode) {

@@ -16,6 +16,17 @@ export interface Anchor {
 
 export type CommentStatus = "open" | "resolved";
 
+/** Snapshot of the source the comment was made against, used to detect edits. */
+export interface Baseline {
+  /** Hash of the full document source at capture time. */
+  docHash: string;
+  /** The source slice (by line range) the comment anchored to. */
+  sourceText: string;
+  lineStart?: number;
+  lineEnd?: number;
+  capturedAt: string;
+}
+
 export interface Comment {
   id: string;
   /** Document the comment belongs to (absolute path, or "untitled" in browser). */
@@ -27,6 +38,18 @@ export interface Comment {
   status: CommentStatus;
   color: string;
   anchor: Anchor;
+  baseline?: Baseline;
+}
+
+/** How the source under a comment compares to its baseline (derived at runtime). */
+export type AddressState = "untouched" | "edited" | "removed";
+
+export interface CommentChange {
+  state: AddressState;
+  /** Baseline source slice (for edited / removed). */
+  wasText?: string;
+  /** Current source slice at the re-anchored location (for edited). */
+  nowText?: string;
 }
 
 export interface LoadedDocument {
@@ -42,7 +65,7 @@ export interface LoadedDocument {
 
 /** Serialized sidecar file written next to a document / into app data. */
 export interface CommentFile {
-  version: 1;
+  version: 1 | 2;
   document: string;
   comments: Comment[];
 }

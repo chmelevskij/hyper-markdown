@@ -3,12 +3,19 @@ import { useStore } from "../store/useStore";
 import { platform } from "../platform";
 import { toJSON, toMarkdown } from "../lib/export";
 import { parseImport } from "../lib/importComments";
-import type { Comment } from "../types";
+import type { Comment, CommentChange } from "../types";
 
-function CommentCard({ comment }: { comment: Comment }) {
+const CHANGE_LABEL: Record<CommentChange["state"], string> = {
+  untouched: "untouched",
+  edited: "edited",
+  removed: "removed",
+};
+
+function CommentCard({ comment, change }: { comment: Comment; change?: CommentChange }) {
   const selectedId = useStore((s) => s.selectedId);
   const selectComment = useStore((s) => s.selectComment);
   const updateComment = useStore((s) => s.updateComment);
+  const resolveAsAddressed = useStore((s) => s.resolveAsAddressed);
   const deleteComment = useStore((s) => s.deleteComment);
   const [editing, setEditing] = useState(comment.body === "");
   const [draft, setDraft] = useState(comment.body);
@@ -22,6 +29,9 @@ function CommentCard({ comment }: { comment: Comment }) {
         ? `L${lines}–${comment.anchor.sourceLineEnd}`
         : `L${lines}`;
 
+  const state = change?.state;
+  const needsReview = comment.status === "open" && (state === "edited" || state === "removed");
+
   return (
     <div
       className={`comment-card ${selected ? "is-selected" : ""} ${
@@ -32,6 +42,9 @@ function CommentCard({ comment }: { comment: Comment }) {
       <div className="comment-card__head">
         <span className="comment-card__swatch" style={{ background: comment.color }} />
         {lineLabel && <span className="comment-card__lines">{lineLabel}</span>}
+        {state && (
+          <span className={`change-badge change-badge--${state}`}>{CHANGE_LABEL[state]}</span>
+        )}
         <div className="comment-card__actions">
           <button
             className="icon-btn"
@@ -87,21 +100,60 @@ function CommentCard({ comment }: { comment: Comment }) {
           {comment.body || <span className="comment-card__placeholder">Add a note…</span>}
         </p>
       )}
+
+      {needsReview && (
+        <div className="change-diff" onClick={(e) => e.stopPropagation()}>
+          {state === "edited" ? (
+            <>
+              <span className="change-diff__label">was</span>
+              <pre className="change-diff__was">{change?.wasText}</pre>
+              <span className="change-diff__label">now</span>
+              <pre className="change-diff__now">{change?.nowText}</pre>
+            </>
+          ) : (
+            <>
+              <span className="change-diff__label">removed from document</span>
+              <pre className="change-diff__was">{change?.wasText}</pre>
+            </>
+          )}
+          <button
+            className="btn btn--primary change-diff__resolve"
+            onClick={() => resolveAsAddressed(comment.id)}
+          >
+            Resolve as addressed
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
+type Filter = "all" | "review";
+
 export default function CommentSidebar({ width }: { width: number }) {
   const doc = useStore((s) => s.doc);
   const comments = useStore((s) => s.comments);
+  const changes = useStore((s) => s.changes);
   const showResolved = useStore((s) => s.showResolved);
   const toggleShowResolved = useStore((s) => s.toggleShowResolved);
   const setViewMode = useStore((s) => s.setViewMode);
   const importComments = useStore((s) => s.importComments);
   const [toast, setToast] = useState<string | null>(null);
+  const [filter, setFilter] = useState<Filter>("all");
 
-  const visible = comments.filter((c) => showResolved || c.status === "open");
+  const needsReview = (c: Comment) => {
+    const s = changes[c.id]?.state;
+    return c.status === "open" && (s === "edited" || s === "removed");
+  };
+
   const openCount = comments.filter((c) => c.status === "open").length;
+  const reviewCount = comments.filter(needsReview).length;
+
+  const visible = comments.filter((c) => {
+    if (!showResolved && c.status !== "open") return false;
+    if (filter === "review") return needsReview(c);
+    return true;
+  });
 
   const flash = (msg: string) => {
     setToast(msg);
@@ -144,7 +196,9 @@ export default function CommentSidebar({ width }: { width: number }) {
     <aside className="sidebar" style={{ flexBasis: width, width }}>
       <div className="sidebar__head">
         <h2>Comments</h2>
-        <span className="sidebar__count">{openCount} open</span>
+        <span className="sidebar__count">
+          {openCount} open{reviewCount > 0 ? ` · ${reviewCount} to review` : ""}
+        </span>
         <button
           className="icon-btn sidebar__collapse"
           onClick={() => setViewMode("reading")}
@@ -155,6 +209,20 @@ export default function CommentSidebar({ width }: { width: number }) {
       </div>
 
       <div className="sidebar__export">
+        <div className="sidebar__filter">
+          <button
+            className={`seg__btn ${filter === "all" ? "is-active" : ""}`}
+            onClick={() => setFilter("all")}
+          >
+            All
+          </button>
+          <button
+            className={`seg__btn ${filter === "review" ? "is-active" : ""}`}
+            onClick={() => setFilter("review")}
+          >
+            Needs review{reviewCount > 0 ? ` (${reviewCount})` : ""}
+          </button>
+        </div>
         <button className="btn btn--primary" disabled={!comments.length} onClick={copyMarkdown}>
           Copy for agent
         </button>
@@ -178,11 +246,12 @@ export default function CommentSidebar({ width }: { width: number }) {
       <div className="sidebar__list">
         {visible.length === 0 ? (
           <p className="sidebar__empty">
-            Select text in the document to attach a comment. Each comment carries the quoted
-            source and its line numbers for the agent.
+            {filter === "review"
+              ? "No comments need review — nothing changed under your open comments."
+              : "Select text in the document to attach a comment. Each comment carries the quoted source and its line numbers for the agent."}
           </p>
         ) : (
-          visible.map((c) => <CommentCard key={c.id} comment={c} />)
+          visible.map((c) => <CommentCard key={c.id} comment={c} change={changes[c.id]} />)
         )}
       </div>
 
