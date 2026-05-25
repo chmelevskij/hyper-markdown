@@ -17,16 +17,23 @@ export default function DocumentView() {
   const comments = useStore((s) => s.comments);
   const selectedId = useStore((s) => s.selectedId);
   const safeMode = useStore((s) => s.safeMode);
+  const viewMode = useStore((s) => s.viewMode);
   const renderNonce = useStore((s) => s.renderNonce);
   const addComment = useStore((s) => s.addComment);
   const selectComment = useStore((s) => s.selectComment);
 
+  const reading = viewMode === "reading";
   const rootRef = useRef<HTMLDivElement>(null);
   const [pending, setPending] = useState<PendingSelection | null>(null);
 
   // Paint highlights using the CSS Custom Highlight API (no DOM mutation).
   const paintHighlights = useCallback(() => {
     if (!supportsHighlights || !rootRef.current) return;
+    // Reading mode is a plain reader: no annotations painted.
+    if (reading) {
+      CSS.highlights.clear();
+      return;
+    }
     const root = rootRef.current;
     const buckets = HIGHLIGHT_COLORS.map(() => new Highlight());
     const active = new Highlight();
@@ -43,7 +50,7 @@ export default function DocumentView() {
     }
     buckets.forEach((h, i) => CSS.highlights.set(`hmd-${i}`, h));
     CSS.highlights.set("hmd-active", active);
-  }, [comments, selectedId]);
+  }, [comments, selectedId, reading]);
 
   useEffect(() => {
     paintHighlights();
@@ -55,6 +62,7 @@ export default function DocumentView() {
 
   // Capture a selection inside the content into a pending comment.
   const onMouseUp = useCallback(() => {
+    if (reading) return;
     const sel = window.getSelection();
     const root = rootRef.current;
     if (!sel || sel.isCollapsed || sel.rangeCount === 0 || !root) {
@@ -72,12 +80,12 @@ export default function DocumentView() {
     if (!text) return;
     const rect = range.getBoundingClientRect();
     setPending({ rect, anchor: captureAnchor(root, range) });
-  }, []);
+  }, [reading]);
 
   const onContentClick = useCallback(
     (e: React.MouseEvent) => {
       // Click on an existing highlight selects its comment.
-      if (pending) return;
+      if (reading || pending) return;
       const root = rootRef.current;
       if (!root) return;
       const caret =
@@ -91,7 +99,7 @@ export default function DocumentView() {
         }
       }
     },
-    [comments, pending, selectComment],
+    [comments, pending, reading, selectComment],
   );
 
   const commitComment = (body: string) => {

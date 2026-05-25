@@ -4,26 +4,27 @@ import { platform } from "../platform";
 import { uid } from "../lib/id";
 import type { ImportedComment } from "../lib/importComments";
 
-export type ThemeName = "paper" | "github" | "midnight" | "contrast";
 export type Mode = "light" | "dark";
+/** Reading = plain reader; comment = highlight + annotate with the sidebar. */
+export type ViewMode = "reading" | "comment";
 
+/** Solarized accent hues, used for comment swatches + highlight buckets. */
 export const HIGHLIGHT_COLORS = [
-  "#ffd54a",
-  "#7ee2b8",
-  "#7cc4ff",
-  "#ff9eb1",
-  "#c9a7ff",
+  "#b58900", // yellow
+  "#2aa198", // cyan
+  "#268bd2", // blue
+  "#d33682", // magenta
+  "#6c71c4", // violet
 ];
 
 interface AppState {
   doc: LoadedDocument | null;
   comments: Comment[];
   selectedId: string | null;
-  theme: ThemeName;
   mode: Mode;
+  viewMode: ViewMode;
   safeMode: boolean;
   showResolved: boolean;
-  sidebarVisible: boolean;
   sidebarWidth: number;
   /** Bumped whenever the rendered DOM changes so highlights re-resolve. */
   renderNonce: number;
@@ -37,11 +38,10 @@ interface AppState {
   deleteComment: (id: string) => void;
   selectComment: (id: string | null) => void;
 
-  setTheme: (t: ThemeName) => void;
   setMode: (m: Mode) => void;
+  setViewMode: (v: ViewMode) => void;
   toggleSafeMode: () => void;
   toggleShowResolved: () => void;
-  toggleSidebar: () => void;
   setSidebarWidth: (w: number) => void;
   bumpRender: () => void;
 }
@@ -53,14 +53,13 @@ export const SIDEBAR_MAX = 620;
 
 type Prefs = Pick<
   AppState,
-  "theme" | "mode" | "safeMode" | "sidebarVisible" | "sidebarWidth"
+  "mode" | "viewMode" | "safeMode" | "sidebarWidth"
 >;
 
 const DEFAULT_PREFS: Prefs = {
-  theme: "paper",
   mode: "light",
+  viewMode: "comment",
   safeMode: false,
-  sidebarVisible: true,
   sidebarWidth: 340,
 };
 
@@ -76,10 +75,9 @@ function loadPrefs(): Prefs {
 
 function savePrefs(s: AppState) {
   const prefs: Prefs = {
-    theme: s.theme,
     mode: s.mode,
+    viewMode: s.viewMode,
     safeMode: s.safeMode,
-    sidebarVisible: s.sidebarVisible,
     sidebarWidth: s.sidebarWidth,
   };
   localStorage.setItem(LS_PREFS, JSON.stringify(prefs));
@@ -185,12 +183,12 @@ export const useStore = create<AppState>((set, get) => ({
     set({ selectedId: id });
   },
 
-  setTheme(theme) {
-    set({ theme });
-    savePrefs(get());
-  },
   setMode(mode) {
     set({ mode });
+    savePrefs(get());
+  },
+  setViewMode(viewMode) {
+    set({ viewMode });
     savePrefs(get());
   },
   toggleSafeMode() {
@@ -200,10 +198,6 @@ export const useStore = create<AppState>((set, get) => ({
   },
   toggleShowResolved() {
     set((s) => ({ showResolved: !s.showResolved }));
-  },
-  toggleSidebar() {
-    set((s) => ({ sidebarVisible: !s.sidebarVisible }));
-    savePrefs(get());
   },
   setSidebarWidth(w) {
     set({ sidebarWidth: clampWidth(w) });

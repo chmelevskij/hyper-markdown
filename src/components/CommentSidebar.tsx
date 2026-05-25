@@ -96,7 +96,7 @@ export default function CommentSidebar({ width }: { width: number }) {
   const comments = useStore((s) => s.comments);
   const showResolved = useStore((s) => s.showResolved);
   const toggleShowResolved = useStore((s) => s.toggleShowResolved);
-  const toggleSidebar = useStore((s) => s.toggleSidebar);
+  const setViewMode = useStore((s) => s.setViewMode);
   const importComments = useStore((s) => s.importComments);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -147,8 +147,8 @@ export default function CommentSidebar({ width }: { width: number }) {
         <span className="sidebar__count">{openCount} open</span>
         <button
           className="icon-btn sidebar__collapse"
-          onClick={toggleSidebar}
-          title="Hide comments"
+          onClick={() => setViewMode("reading")}
+          title="Switch to reading mode"
         >
           ⇥
         </button>

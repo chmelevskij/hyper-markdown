@@ -17,8 +17,9 @@ agent can act on your review precisely.
   as agent-ready Markdown (or JSON) to the clipboard or a `.comments.md` file.
 - **Import comments** — read an exported `.md`/`.json` (or a sidecar file) back in;
   comments re-anchor to the current document by their quoted text.
-- **Resizable, collapsible comment sidebar** — drag to resize, toggle to hide/show.
-- **Themes** — Paper, GitHub, Midnight, Contrast — each with light & dark modes.
+- **Reading / Comment modes** — toggle between a plain themed reader and the full
+  highlight-and-annotate experience (with a resizable comment sidebar).
+- **Neobrutalist Solarized theme** — one cohesive theme with light & dark modes.
 - **Safe mode** — render MDX as plain Markdown (no code execution) for untrusted files.
 - **Persistent comments** — saved to a sidecar `*.hmd-comments.json` next to the document.
 

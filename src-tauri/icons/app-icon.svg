@@ -1,0 +1,29 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- hyper-markdown app icon: neobrutalist Solarized tile + the markdown "M" with a
+       hyper lightning bolt. Solarized cream base3 #fdf6e3, ink base02 #073642,
+       blue accent #268bd2; the bolt runs a warm electric gradient. -->
+  <defs>
+    <linearGradient id="bolt" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#b58900"/>   <!-- yellow -->
+      <stop offset="0.5" stop-color="#cb4b16"/> <!-- orange -->
+      <stop offset="1" stop-color="#d33682"/>   <!-- magenta -->
+    </linearGradient>
+  </defs>
+
+  <!-- Hard offset drop-shadow (neobrutalism) in Solarized blue -->
+  <rect x="230" y="230" width="620" height="620" fill="#268bd2"/>
+
+  <!-- Cream tile with a thick dark ink border -->
+  <rect x="174" y="174" width="620" height="620"
+        fill="#fdf6e3" stroke="#073642" stroke-width="24"/>
+
+  <g transform="translate(264 348.6) scale(2.115)">
+    <!-- Markdown "M" in Solarized ink -->
+    <path fill="#073642" d="M30 98V30h20l20 25 20-25h20v68H90V59L70 84 50 59v39H30z"/>
+    <!-- Hyper lightning bolt (gradient + ink outline) replacing the markdown arrow -->
+    <g transform="translate(116.2 23.2) scale(3.4)">
+      <path fill="url(#bolt)" stroke="#073642" stroke-width="1.1" stroke-linejoin="round"
+            d="M7 2v11h3v9l7-12h-4l4-8z"/>
+    </g>
+  </g>
+</svg>

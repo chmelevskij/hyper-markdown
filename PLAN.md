@@ -19,7 +19,8 @@ precisely.
 | Documents | **Open local `.md` / `.mdx` files** + **drag-and-drop** (viewer/annotator, not an authoring editor) |
 | Rich content | **MDX** (runtime-compiled), GFM, frontmatter, math, **Mermaid** diagrams, syntax-highlighted code |
 | Headline feature | **Highlight → comment → export** to clipboard and/or `comments.md`, with quoted source + line refs |
-| Theming | CSS-variable theme system, multiple built-in themes, light/dark |
+| Theming | CSS-variable theme system, single neobrutalist Solarized theme, light/dark |
+| Modes | **Reading** (plain themed reader) and **Comment** (highlight + annotate) |
 
 ### Primary user flow
 1. Open or drop a Markdown/MDX file.
@@ -169,10 +170,10 @@ MDX executes arbitrary JS/JSX, so an opened `.mdx` file is effectively code.
 - [x] **Phase 5 — Export & import.** Structured Markdown + JSON builders, clipboard + file
       write. Import reads exported `.md` / `.json` (and full sidecar JSON) back, re-anchoring
       each comment to the current document by its quoted text.
-- [x] **Phase 6 (partial) — Polish.** Safe-mode toggle, four themes, light/dark, app
-      packaging (`pnpm tauri build` → `.app` + `.dmg`), resizable + collapsible comment
-      sidebar (width persisted, clamped 260–620), `scrollbar-gutter: stable` to stop
-      scrollbar-induced layout shift.
+- [x] **Phase 6 (partial) — Polish.** Safe-mode toggle, single neobrutalist Solarized
+      theme (light/dark), Reading/Comment mode toggle, app packaging
+      (`pnpm tauri build` → `.app` + `.dmg`), resizable comment sidebar (width persisted,
+      clamped 260–620), `scrollbar-gutter: stable` to stop scrollbar-induced layout shift.
 - [ ] **Remaining polish.** External-edit live reload, more keyboard shortcuts,
       jump-to-highlight scroll, "unanchored" badge for imported comments whose quote isn't
       found, strict CSP.

@@ -1,23 +1,14 @@
-import { useStore, type ThemeName } from "../store/useStore";
-
-const THEMES: { value: ThemeName; label: string }[] = [
-  { value: "paper", label: "Paper" },
-  { value: "github", label: "GitHub" },
-  { value: "midnight", label: "Midnight" },
-  { value: "contrast", label: "Contrast" },
-];
+import { useStore } from "../store/useStore";
 
 export default function Toolbar() {
   const doc = useStore((s) => s.doc);
-  const theme = useStore((s) => s.theme);
   const mode = useStore((s) => s.mode);
+  const viewMode = useStore((s) => s.viewMode);
   const safeMode = useStore((s) => s.safeMode);
-  const sidebarVisible = useStore((s) => s.sidebarVisible);
   const openDocument = useStore((s) => s.openDocument);
-  const setTheme = useStore((s) => s.setTheme);
   const setMode = useStore((s) => s.setMode);
+  const setViewMode = useStore((s) => s.setViewMode);
   const toggleSafeMode = useStore((s) => s.toggleSafeMode);
-  const toggleSidebar = useStore((s) => s.toggleSidebar);
 
   return (
     <header className="toolbar">
@@ -31,41 +22,41 @@ export default function Toolbar() {
         )}
       </div>
       <div className="toolbar__right">
-        <button className="btn btn--ghost" onClick={openDocument}>
+        <button className="btn" onClick={openDocument}>
           Open…
         </button>
-        <label className="toolbar__field">
-          <select value={theme} onChange={(e) => setTheme(e.target.value as ThemeName)}>
-            {THEMES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        {doc && (
+          <div className="seg" role="group" aria-label="View mode">
+            <button
+              className={`seg__btn ${viewMode === "reading" ? "is-active" : ""}`}
+              onClick={() => setViewMode("reading")}
+            >
+              📖 Read
+            </button>
+            <button
+              className={`seg__btn ${viewMode === "comment" ? "is-active" : ""}`}
+              onClick={() => setViewMode("comment")}
+            >
+              💬 Comment
+            </button>
+          </div>
+        )}
+        {doc && (
+          <button
+            className={`btn ${safeMode ? "is-active" : ""}`}
+            title="Render MDX as plain Markdown (no code execution)"
+            onClick={toggleSafeMode}
+          >
+            {safeMode ? "🔒 Safe" : "🔓 MDX"}
+          </button>
+        )}
         <button
-          className="btn btn--ghost"
+          className="btn"
           title="Toggle light / dark"
           onClick={() => setMode(mode === "dark" ? "light" : "dark")}
         >
           {mode === "dark" ? "☾" : "☀"}
         </button>
-        <button
-          className={`btn btn--ghost ${safeMode ? "is-active" : ""}`}
-          title="Render MDX as plain Markdown (no code execution)"
-          onClick={toggleSafeMode}
-        >
-          {safeMode ? "🔒 Safe" : "🔓 MDX"}
-        </button>
-        {doc && (
-          <button
-            className={`btn btn--ghost ${sidebarVisible ? "is-active" : ""}`}
-            title="Show / hide comments"
-            onClick={toggleSidebar}
-          >
-            ⬚ Comments
-          </button>
-        )}
       </div>
     </header>
   );

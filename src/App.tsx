@@ -13,20 +13,15 @@ import "katex/dist/katex.min.css";
 
 export default function App() {
   const doc = useStore((s) => s.doc);
-  const theme = useStore((s) => s.theme);
   const mode = useStore((s) => s.mode);
-  const sidebarVisible = useStore((s) => s.sidebarVisible);
+  const viewMode = useStore((s) => s.viewMode);
   const sidebarWidth = useStore((s) => s.sidebarWidth);
-  const comments = useStore((s) => s.comments);
-  const toggleSidebar = useStore((s) => s.toggleSidebar);
   const loadDocument = useStore((s) => s.loadDocument);
-  const openCount = comments.filter((c) => c.status === "open").length;
 
-  // Apply theme + mode to the document root for CSS variable cascades.
+  // Apply mode to the document root for CSS variable cascades.
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
     document.documentElement.dataset.mode = mode;
-  }, [theme, mode]);
+  }, [mode]);
 
   // Global file-drop (Tauri OS drop or browser drag-drop).
   useEffect(() => platform.onFileDrop(loadDocument), [loadDocument]);
@@ -38,19 +33,11 @@ export default function App() {
         {doc ? (
           <>
             <DocumentView />
-            {sidebarVisible ? (
+            {viewMode === "comment" && (
               <>
                 <SidebarSplitter />
                 <CommentSidebar width={sidebarWidth} />
               </>
-            ) : (
-              <button
-                className="sidebar-reveal"
-                onClick={toggleSidebar}
-                title="Show comments"
-              >
-                💬{openCount > 0 ? ` ${openCount}` : ""}
-              </button>
             )}
           </>
         ) : (
