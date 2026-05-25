@@ -26,6 +26,7 @@ export default function DocumentView() {
 
   const reading = viewMode === "reading";
   const rootRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [pending, setPending] = useState<PendingSelection | null>(null);
 
   // Paint highlights using the CSS Custom Highlight API (no DOM mutation).
@@ -93,6 +94,27 @@ export default function DocumentView() {
     classify();
   }, [paintHighlights, classify, renderNonce]);
 
+  // Scroll the selected comment's anchor into view (e.g. clicked in the sidebar).
+  // Skips when the anchor is already fully visible to avoid jarring jumps —
+  // notably when the selection originated from clicking the highlight itself.
+  useEffect(() => {
+    if (!selectedId) return;
+    const root = rootRef.current;
+    const scroller = scrollRef.current;
+    if (!root || !scroller) return;
+    const comment = comments.find((c) => c.id === selectedId);
+    if (!comment) return;
+    const range = resolveRange(root, comment.anchor);
+    if (!range) return;
+    const rect = range.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) return;
+    const view = scroller.getBoundingClientRect();
+    if (rect.top >= view.top && rect.bottom <= view.bottom) return;
+    const target =
+      scroller.scrollTop + (rect.top - view.top) - view.height / 2 + rect.height / 2;
+    scroller.scrollTo({ top: Math.max(0, target), behavior: "smooth" });
+  }, [selectedId, comments, renderNonce]);
+
   useEffect(() => () => {
     if (supportsHighlights) CSS.highlights.clear();
   }, []);
@@ -155,7 +177,11 @@ export default function DocumentView() {
   if (!doc) return null;
 
   return (
-    <div className="doc-scroll" onMouseDown={() => pending && setPending(null)}>
+    <div
+      ref={scrollRef}
+      className="doc-scroll"
+      onMouseDown={() => pending && setPending(null)}
+    >
       <article
         ref={rootRef}
         className="markdown-body"
