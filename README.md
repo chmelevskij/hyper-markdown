@@ -45,12 +45,22 @@ Paste it into Claude Code (or any agent) and it has precise, line-anchored instr
 pnpm install
 
 # Desktop app (the real target):
-pnpm tauri dev          # release bundle: pnpm tauri build
+pnpm tauri dev          # release bundle: pnpm app:build
 
 # Browser preview (fast UI iteration; file I/O falls back to the web File API
 # + localStorage, export downloads a file / copies to clipboard):
 pnpm dev                # http://localhost:1420
 ```
+
+### Install the built app (macOS)
+
+```bash
+pnpm app:install        # builds, then (re)installs into /Applications and relaunches
+```
+
+This quits any running copy, replaces `/Applications/hyper-markdown.app` with a
+fresh release build, and opens it. On other platforms, run `pnpm app:build` and
+grab the bundle from `src-tauri/target/release/bundle/`.
 
 ## Architecture
 

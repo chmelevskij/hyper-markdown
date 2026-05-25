@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "app:build": "tauri build",
+    "app:install": "bash scripts/install-macos.sh"
   },
   "dependencies": {
     "@mdx-js/mdx": "^3.1.1",
