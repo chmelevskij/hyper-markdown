@@ -1,0 +1,164 @@
+/* Theme system: CSS variables keyed by [data-theme] + [data-mode] on <html>. */
+
+:root {
+  --radius: 10px;
+  --radius-sm: 6px;
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-body: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  /* Highlight palette (translucent so text stays readable). */
+  --hl-0: rgba(255, 213, 74, 0.45);
+  --hl-1: rgba(126, 226, 184, 0.45);
+  --hl-2: rgba(124, 196, 255, 0.45);
+  --hl-3: rgba(255, 158, 177, 0.45);
+  --hl-4: rgba(201, 167, 255, 0.45);
+  --hl-active: rgba(255, 184, 0, 0.7);
+}
+
+/* ---- Neutral defaults per mode (overridden by themes below) ---- */
+[data-mode="light"] {
+  --bg: #f6f6f4;
+  --surface: #ffffff;
+  --surface-2: #f0f0ee;
+  --fg: #1f2328;
+  --muted: #6b7280;
+  --border: #e3e3e0;
+  --accent: #4f46e5;
+  --link: #2563eb;
+  --code-bg: #f6f8fa;
+  --quote-border: #d0d7de;
+}
+[data-mode="dark"] {
+  --bg: #16171b;
+  --surface: #1e2026;
+  --surface-2: #25272e;
+  --fg: #e6e7ea;
+  --muted: #9aa0aa;
+  --border: #30333b;
+  --accent: #8b87ff;
+  --link: #79b8ff;
+  --code-bg: #1b1d22;
+  --quote-border: #3a3f48;
+}
+
+/* ---- Paper (warm, serif-forward) ---- */
+[data-theme="paper"][data-mode="light"] {
+  --bg: #f4efe6;
+  --surface: #fbf7ef;
+  --surface-2: #f0e9dc;
+  --fg: #2d2a26;
+  --muted: #7a7266;
+  --border: #e2d9c8;
+  --accent: #b4622d;
+  --link: #a85423;
+  --code-bg: #f3ece0;
+  --quote-border: #d8cdb8;
+}
+[data-theme="paper"][data-mode="dark"] {
+  --bg: #1c1a17;
+  --surface: #24211c;
+  --surface-2: #2c2823;
+  --fg: #ece4d6;
+  --muted: #a59a87;
+  --border: #38332b;
+  --accent: #d98a4f;
+  --link: #e0a36a;
+  --code-bg: #221f1a;
+  --quote-border: #443d31;
+}
+
+/* ---- GitHub ---- */
+[data-theme="github"][data-mode="light"] {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f6f8fa;
+  --fg: #1f2328;
+  --muted: #656d76;
+  --border: #d0d7de;
+  --accent: #0969da;
+  --link: #0969da;
+  --code-bg: #f6f8fa;
+  --quote-border: #d0d7de;
+  --font-body: var(--font-ui);
+}
+[data-theme="github"][data-mode="dark"] {
+  --bg: #0d1117;
+  --surface: #0d1117;
+  --surface-2: #161b22;
+  --fg: #e6edf3;
+  --muted: #7d8590;
+  --border: #30363d;
+  --accent: #2f81f7;
+  --link: #2f81f7;
+  --code-bg: #161b22;
+  --quote-border: #30363d;
+  --font-body: var(--font-ui);
+}
+
+/* ---- Midnight (deep indigo) ---- */
+[data-theme="midnight"][data-mode="light"] {
+  --bg: #eef0f7;
+  --surface: #ffffff;
+  --surface-2: #e7eaf4;
+  --fg: #1b1f33;
+  --muted: #5b6178;
+  --border: #d4d8e8;
+  --accent: #5b54e6;
+  --link: #4338ca;
+  --code-bg: #eceefb;
+  --quote-border: #cdd2e6;
+}
+[data-theme="midnight"][data-mode="dark"] {
+  --bg: #0b0d1a;
+  --surface: #12152a;
+  --surface-2: #181c36;
+  --fg: #dfe2f5;
+  --muted: #8b91b8;
+  --border: #262b4d;
+  --accent: #8b87ff;
+  --link: #9d98ff;
+  --code-bg: #12152a;
+  --quote-border: #2a2f56;
+  --font-body: var(--font-ui);
+}
+
+/* ---- Contrast (high-contrast accessibility) ---- */
+[data-theme="contrast"][data-mode="light"] {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f0f0f0;
+  --fg: #000000;
+  --muted: #444444;
+  --border: #000000;
+  --accent: #0033cc;
+  --link: #0033cc;
+  --code-bg: #f2f2f2;
+  --quote-border: #000000;
+  --font-body: var(--font-ui);
+}
+[data-theme="contrast"][data-mode="dark"] {
+  --bg: #000000;
+  --surface: #0a0a0a;
+  --surface-2: #141414;
+  --fg: #ffffff;
+  --muted: #c8c8c8;
+  --border: #ffffff;
+  --accent: #ffd000;
+  --link: #ffe24d;
+  --code-bg: #0d0d0d;
+  --quote-border: #ffffff;
+  --font-body: var(--font-ui);
+}
+
+/* ---- Custom Highlight API painting ---- */
+::highlight(hmd-0) { background-color: var(--hl-0); }
+::highlight(hmd-1) { background-color: var(--hl-1); }
+::highlight(hmd-2) { background-color: var(--hl-2); }
+::highlight(hmd-3) { background-color: var(--hl-3); }
+::highlight(hmd-4) { background-color: var(--hl-4); }
+::highlight(hmd-active) {
+  background-color: var(--hl-active);
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+}

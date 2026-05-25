@@ -1,0 +1,122 @@
+.markdown-body {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 40px 32px 120px;
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.7;
+  color: var(--fg);
+}
+
+.markdown-body > *:first-child { margin-top: 0; }
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4 {
+  font-family: var(--font-ui);
+  line-height: 1.25;
+  margin: 1.8em 0 0.6em;
+  font-weight: 650;
+}
+.markdown-body h1 { font-size: 2em; }
+.markdown-body h2 {
+  font-size: 1.5em;
+  padding-bottom: 0.25em;
+  border-bottom: 1px solid var(--border);
+}
+.markdown-body h3 { font-size: 1.22em; }
+.markdown-body h4 { font-size: 1.05em; }
+
+.markdown-body p { margin: 0 0 1em; }
+.markdown-body a { color: var(--link); text-decoration: none; }
+.markdown-body a:hover { text-decoration: underline; }
+
+.markdown-body strong { font-weight: 680; }
+
+.markdown-body ul,
+.markdown-body ol { padding-left: 1.5em; margin: 0 0 1em; }
+.markdown-body li { margin: 0.25em 0; }
+.markdown-body li::marker { color: var(--muted); }
+.markdown-body input[type="checkbox"] { margin-right: 0.5em; }
+
+.markdown-body blockquote {
+  margin: 1em 0;
+  padding: 0.4em 1em;
+  border-left: 3px solid var(--quote-border);
+  color: var(--muted);
+}
+.markdown-body blockquote p:last-child { margin-bottom: 0; }
+
+.markdown-body hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2em 0;
+}
+
+/* Inline code */
+.markdown-body :not(pre) > code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.1em 0.36em;
+}
+
+/* Code blocks (Shiki output lives in .code-block) */
+.code-block {
+  margin: 1.2em 0;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  font-size: 13.5px;
+}
+.code-block pre,
+.code-block.code-block--plain {
+  margin: 0;
+  padding: 14px 16px;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  line-height: 1.55;
+}
+/* Shiki sets its own bg via inline styles; align padding/scroll. */
+.code-block pre.shiki { padding: 14px 16px; }
+.code-block--plain code { font-family: var(--font-mono); }
+
+/* Tables (GFM) */
+.markdown-body table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1.2em 0;
+  font-size: 0.95em;
+}
+.markdown-body th,
+.markdown-body td {
+  border: 1px solid var(--border);
+  padding: 7px 12px;
+  text-align: left;
+}
+.markdown-body th { background: var(--surface-2); font-family: var(--font-ui); }
+.markdown-body tr:nth-child(even) td { background: var(--surface-2); }
+
+/* Images */
+.markdown-body img { max-width: 100%; border-radius: var(--radius-sm); }
+
+/* Mermaid */
+.mermaid-figure {
+  margin: 1.4em 0;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-align: center;
+  overflow-x: auto;
+}
+.mermaid-figure svg { max-width: 100%; height: auto; }
+
+/* KaTeX inherits color */
+.markdown-body .katex { font-size: 1.05em; }
+
+/* Selection styling for readability */
+.markdown-body ::selection { background: rgba(125, 125, 125, 0.3); }
