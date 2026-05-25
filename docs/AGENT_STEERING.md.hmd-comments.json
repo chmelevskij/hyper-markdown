@@ -1,0 +1,178 @@
+{
+  "version": 2,
+  "document": "/Users/tomche/development/vibes/hyper-markdown/docs/AGENT_STEERING.md",
+  "comments": [
+    {
+      "id": "a0d319b5-2593-4277-82e0-5416db1469db",
+      "documentPath": "/Users/tomche/development/vibes/hyper-markdown/docs/AGENT_STEERING.md",
+      "createdAt": "2026-05-25T12:39:32.210Z",
+      "updatedAt": "2026-05-25T12:45:18.473Z",
+      "body": "Redraw this as mermaid diagram",
+      "status": "resolved",
+      "color": "#b58900",
+      "anchor": {
+        "quote": "  ┌─────────────────────────────────────────────┐\n            │ hyper-markdown (desktop app)                 │\n            │  read doc → highlight passage → add comment  │\n            └───────────────┬─────────────────────────────┘\n                            │ writes\n                            ▼\n              docs/AGENT_STEERING.md.hmd-comments.json   ← sidecar (storage)\n                            │ projected (token-efficient)\n                            ▼\n            ┌─────────────────────────────────────────────┐\n            │ Claude skill `/review-comments`              │\n            │  list open comments → agent edits the doc →  │\n            │  mark resolved (re-baseline)                 │\n            └─────────────────────────────────────────────┘",
+        "prefix": "he changes.\n\nThe loop\n          ",
+        "suffix": "\nThe agent already has the repo ",
+        "start": 355,
+        "end": 1121,
+        "sourceLineStart": 14,
+        "sourceLineEnd": 29
+      },
+      "baseline": {
+        "docHash": "1b659e61c87f94",
+        "sourceText": "```\n            ┌─────────────────────────────────────────────┐\n            │ hyper-markdown (desktop app)                 │\n            │  read doc → highlight passage → add comment  │\n            └───────────────┬─────────────────────────────┘\n                            │ writes\n                            ▼\n              docs/AGENT_STEERING.md.hmd-comments.json   ← sidecar (storage)\n                            │ projected (token-efficient)\n                            ▼\n            ┌─────────────────────────────────────────────┐\n            │ Claude skill `/review-comments`              │\n            │  list open comments → agent edits the doc →  │\n            │  mark resolved (re-baseline)                 │\n            └─────────────────────────────────────────────┘\n```",
+        "lineStart": 14,
+        "lineEnd": 29,
+        "capturedAt": "2026-05-25T12:45:18.473Z"
+      }
+    },
+    {
+      "id": "9c6aae10-81a3-41e1-8e03-ee1f6152a07e",
+      "documentPath": "/Users/tomche/development/vibes/hyper-markdown/docs/AGENT_STEERING.md",
+      "createdAt": "2026-05-25T12:41:48.981Z",
+      "updatedAt": "2026-05-25T12:45:18.558Z",
+      "body": "I don’t care about MCP, remove this from here.",
+      "status": "resolved",
+      "color": "#2aa198",
+      "anchor": {
+        "quote": "MCP server. Longer term, expose list / get / resolve as tools so the\nagent pulls comments lazily instead of front-loading the digest.",
+        "prefix": "es) before emitting the digest.\n",
+        "suffix": "\nRound-trip. Should the agent be",
+        "start": 4046,
+        "end": 4179,
+        "sourceLineStart": 115,
+        "sourceLineEnd": 116
+      },
+      "baseline": {
+        "docHash": "1b659e61c87f94",
+        "sourceText": "- **MCP server.** Longer term, expose `list` / `get` / `resolve` as tools so the\n  agent pulls comments lazily instead of front-loading the digest.",
+        "lineStart": 115,
+        "lineEnd": 116,
+        "capturedAt": "2026-05-25T12:45:18.558Z"
+      }
+    },
+    {
+      "id": "b050cd4a-8324-46ab-b2be-d53e978c2c8e",
+      "documentPath": "/Users/tomche/development/vibes/hyper-markdown/docs/AGENT_STEERING.md",
+      "createdAt": "2026-05-25T12:42:40.427Z",
+      "updatedAt": "2026-05-25T12:45:18.600Z",
+      "body": "Let’s ignore this for now.",
+      "status": "resolved",
+      "color": "#268bd2",
+      "anchor": {
+        "quote": "Round-trip. Should the agent be able to reply to a comment (a thread)\nrather than only resolve it?",
+        "prefix": "ad of front-loading the digest.\n",
+        "suffix": "\n",
+        "start": 4180,
+        "end": 4278,
+        "sourceLineStart": 117,
+        "sourceLineEnd": 118
+      },
+      "baseline": {
+        "docHash": "1b659e61c87f94",
+        "sourceText": "- **Round-trip.** Should the agent be able to *reply* to a comment (a thread)\n  rather than only resolve it?",
+        "lineStart": 117,
+        "lineEnd": 118,
+        "capturedAt": "2026-05-25T12:45:18.600Z"
+      }
+    },
+    {
+      "id": "bee0ab98-95b8-4466-bd3e-e0ea551e3390",
+      "documentPath": "/Users/tomche/development/vibes/hyper-markdown/docs/AGENT_STEERING.md",
+      "createdAt": "2026-05-25T12:43:30.495Z",
+      "updatedAt": "2026-05-25T12:45:18.515Z",
+      "body": "I wan’t to rename this to be `/hmd-comments`",
+      "status": "resolved",
+      "color": "#d33682",
+      "anchor": {
+        "quote": "The Claude skill: /review-comments",
+        "prefix": "as no resolvable source line.\n\n\n",
+        "suffix": "\nLives at .claude/skills/review-",
+        "start": 2636,
+        "end": 2670,
+        "sourceLineStart": 80,
+        "sourceLineEnd": 80
+      },
+      "baseline": {
+        "docHash": "1b659e61c87f94",
+        "sourceText": "## The Claude skill: `/review-comments`",
+        "lineStart": 80,
+        "lineEnd": 80,
+        "capturedAt": "2026-05-25T12:45:18.515Z"
+      }
+    },
+    {
+      "id": "fe590127-6bc9-43f3-87d1-3cd345023672",
+      "documentPath": "/Users/tomche/development/vibes/hyper-markdown/docs/AGENT_STEERING.md",
+      "createdAt": "2026-05-25T12:46:58.838Z",
+      "updatedAt": "2026-05-25T12:46:58.838Z",
+      "body": "Redraw this as mermaid diagram",
+      "status": "resolved",
+      "color": "#b58900",
+      "anchor": {
+        "quote": "  ┌─────────────────────────────────────────────┐\n            │ hyper-markdown (desktop app)                 │\n            │  read doc → highlight passage → add comment  │\n            └───────────────┬─────────────────────────────┘\n                            │ writes\n                            ▼\n              docs/AGENT_STEERING.md.hmd-comments.json   ← sidecar (storage)\n                            │ projected (token-efficient)\n                            ▼\n            ┌─────────────────────────────────────────────┐\n            │ Claude skill `/review-comments`              │\n            │  list open comments → agent edits the doc →  │\n            │  mark resolved (re-baseline)                 │\n            └─────────────────────────────────────────────┘",
+        "prefix": "he changes.\n\nThe loop\n          ",
+        "suffix": "\nThe agent already has the repo ",
+        "start": 355,
+        "end": 1121,
+        "sourceLineStart": 14,
+        "sourceLineEnd": 29
+      }
+    },
+    {
+      "id": "b8282800-7be7-40ff-a8d4-bd1eecf90358",
+      "documentPath": "/Users/tomche/development/vibes/hyper-markdown/docs/AGENT_STEERING.md",
+      "createdAt": "2026-05-25T12:46:58.838Z",
+      "updatedAt": "2026-05-25T12:46:58.838Z",
+      "body": "I don’t care about MCP, remove this from here.",
+      "status": "resolved",
+      "color": "#2aa198",
+      "anchor": {
+        "quote": "MCP server. Longer term, expose list / get / resolve as tools so the\nagent pulls comments lazily instead of front-loading the digest.",
+        "prefix": "es) before emitting the digest.\n",
+        "suffix": "\nRound-trip. Should the agent be",
+        "start": 4046,
+        "end": 4179,
+        "sourceLineStart": 115,
+        "sourceLineEnd": 116
+      }
+    },
+    {
+      "id": "bd77b7ec-94d5-440d-8c01-c6d297791a95",
+      "documentPath": "/Users/tomche/development/vibes/hyper-markdown/docs/AGENT_STEERING.md",
+      "createdAt": "2026-05-25T12:46:58.838Z",
+      "updatedAt": "2026-05-25T12:46:58.838Z",
+      "body": "Let’s ignore this for now.",
+      "status": "resolved",
+      "color": "#268bd2",
+      "anchor": {
+        "quote": "Round-trip. Should the agent be able to reply to a comment (a thread)\nrather than only resolve it?",
+        "prefix": "ad of front-loading the digest.\n",
+        "suffix": "\n",
+        "start": 4180,
+        "end": 4278,
+        "sourceLineStart": 117,
+        "sourceLineEnd": 118
+      }
+    },
+    {
+      "id": "4104660d-8345-4de8-a267-7e8ee1329901",
+      "documentPath": "/Users/tomche/development/vibes/hyper-markdown/docs/AGENT_STEERING.md",
+      "createdAt": "2026-05-25T12:46:58.838Z",
+      "updatedAt": "2026-05-25T12:46:58.838Z",
+      "body": "I wan’t to rename this to be `/hmd-comments`",
+      "status": "resolved",
+      "color": "#d33682",
+      "anchor": {
+        "quote": "The Claude skill: /review-comments",
+        "prefix": "as no resolvable source line.\n\n\n",
+        "suffix": "\nLives at .claude/skills/review-",
+        "start": 2636,
+        "end": 2670,
+        "sourceLineStart": 80,
+        "sourceLineEnd": 80
+      }
+    }
+  ]
+}
