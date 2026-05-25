@@ -187,9 +187,19 @@ MDX executes arbitrary JS/JSX, so an opened `.mdx` file is effectively code.
       identical for Markdown and MDX). Sidebar shows a per-comment badge, a "Needs
       review" filter + count, a before→after diff, and a "Resolve as addressed" action
       that re-baselines to the current source.
-- [ ] **Remaining polish.** External-edit live reload (pairs with addressed tracking:
-      reclassify on reload), more keyboard shortcuts, jump-to-highlight scroll,
-      "unanchored" badge for imported comments whose quote isn't found, strict CSP.
+- [x] **Phase 8 — Multi-doc + live + CLI.**
+      - **Tabs:** store refactored from a single `doc` to a list of `Tab`s (each with its
+        own doc/comments/changes/selection); tab bar with per-tab open-comment count;
+        re-opening a path activates its tab. Open tabs are restored on relaunch (Tauri).
+      - **Live reload:** a Rust `notify` watcher on each open doc's parent dir emits
+        `file-changed`; the frontend debounces, re-reads, and re-renders, so external
+        edits refresh the view and `edited` flags update live.
+      - **`hmd` CLI:** macOS `open -a` wrapper (`scripts/hmd`, installed by
+        `pnpm app:install`) hands files to the app; the app handles the OS open-file
+        event (with a pending-files buffer for cold start) and opens them as tabs.
+- [ ] **Remaining polish.** More keyboard shortcuts, jump-to-highlight scroll,
+      "unanchored" badge for imported comments whose quote isn't found, strict CSP,
+      cross-platform CLI (single-instance argv forwarding for Linux/Windows).
 
 ### Verified (browser preview, Chrome DevTools MCP)
 Render pipeline (frontmatter, GFM task lists, tables, math), Mermaid SVG, Shiki highlighting,

@@ -81,6 +81,75 @@ body {
 .seg__btn + .seg__btn { border-left: var(--border-w) solid var(--border); }
 .seg__btn.is-active { background: var(--accent); color: var(--accent-fg); }
 
+/* ---- Tab bar ---- */
+.tabbar {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  padding: 0 8px;
+  background: var(--surface-2);
+  border-bottom: var(--border-w) solid var(--border);
+  flex: 0 0 auto;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 240px;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  background: transparent;
+  border: var(--border-w) solid transparent;
+  border-bottom: none;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.tab:hover { color: var(--fg); }
+.tab.is-active {
+  color: var(--fg);
+  background: var(--bg);
+  border-color: var(--border);
+  margin-bottom: calc(-1 * var(--border-w));
+}
+.tab__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tab__count {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 0 5px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  border: 1px solid var(--border);
+}
+.tab__close {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 2px 3px;
+}
+.tab__close:hover { color: var(--fg); background: var(--surface-2); }
+.tab__new {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0 12px;
+}
+.tab__new:hover { color: var(--fg); }
+
 /* ---- Body layout ---- */
 .app__body {
   flex: 1 1 auto;

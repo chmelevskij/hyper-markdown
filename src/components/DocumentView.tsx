@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useStore, HIGHLIGHT_COLORS } from "../store/useStore";
+import { useStore, HIGHLIGHT_COLORS, activeTab, activeComments } from "../store/useStore";
 import { captureAnchor, resolveRange, sourceLinesForRange } from "../lib/anchor";
 import { hashSource, normalizeForCompare, sliceSourceLines } from "../lib/changes";
 import type { Anchor, CommentChange } from "../types";
@@ -14,12 +14,12 @@ interface PendingSelection {
 const supportsHighlights = typeof CSS !== "undefined" && "highlights" in CSS;
 
 export default function DocumentView() {
-  const doc = useStore((s) => s.doc);
-  const comments = useStore((s) => s.comments);
-  const selectedId = useStore((s) => s.selectedId);
+  const doc = useStore((s) => activeTab(s)?.doc ?? null);
+  const comments = useStore(activeComments);
+  const selectedId = useStore((s) => activeTab(s)?.selectedId ?? null);
   const safeMode = useStore((s) => s.safeMode);
   const viewMode = useStore((s) => s.viewMode);
-  const renderNonce = useStore((s) => s.renderNonce);
+  const renderNonce = useStore((s) => activeTab(s)?.renderNonce ?? 0);
   const addComment = useStore((s) => s.addComment);
   const selectComment = useStore((s) => s.selectComment);
   const setChanges = useStore((s) => s.setChanges);

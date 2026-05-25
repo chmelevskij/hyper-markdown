@@ -18,22 +18,33 @@ export const HIGHLIGHT_COLORS = [
   "#6c71c4", // violet
 ];
 
-interface AppState {
-  doc: LoadedDocument | null;
+/** One open document and all of its per-document state. */
+export interface Tab {
+  id: string;
+  doc: LoadedDocument;
   comments: Comment[];
   selectedId: string | null;
+  changes: Record<string, CommentChange>;
+  /** Bumped whenever this tab's rendered DOM changes so highlights re-resolve. */
+  renderNonce: number;
+}
+
+interface AppState {
+  tabs: Tab[];
+  activeTabId: string | null;
   mode: Mode;
   viewMode: ViewMode;
   safeMode: boolean;
   showResolved: boolean;
   sidebarWidth: number;
-  /** Per-comment change state vs. baseline (derived after each render). */
-  changes: Record<string, CommentChange>;
-  /** Bumped whenever the rendered DOM changes so highlights re-resolve. */
-  renderNonce: number;
 
   loadDocument: (doc: LoadedDocument) => Promise<void>;
   openDocument: () => Promise<void>;
+  restoreSession: () => Promise<void>;
+  closeTab: (id: string) => void;
+  setActiveTab: (id: string) => void;
+  /** Replace a tab's source after an external edit (live reload). */
+  reloadTabByPath: (path: string, source: string) => void;
 
   addComment: (anchor: Anchor, body: string) => string;
   importComments: (list: ImportedComment[]) => number;
@@ -52,14 +63,25 @@ interface AppState {
 }
 
 const LS_PREFS = "hmd:prefs";
+const LS_SESSION = "hmd:session";
 
 export const SIDEBAR_MIN = 260;
 export const SIDEBAR_MAX = 620;
 
-type Prefs = Pick<
-  AppState,
-  "mode" | "viewMode" | "safeMode" | "sidebarWidth"
->;
+/** Stable empties so selectors don't allocate when there is no active tab. */
+const EMPTY_COMMENTS: Comment[] = [];
+const EMPTY_CHANGES: Record<string, CommentChange> = {};
+
+/** Selector: the currently active tab (or undefined). */
+export const activeTab = (s: AppState): Tab | undefined =>
+  s.tabs.find((t) => t.id === s.activeTabId);
+
+export const activeComments = (s: AppState): Comment[] =>
+  activeTab(s)?.comments ?? EMPTY_COMMENTS;
+export const activeChanges = (s: AppState): Record<string, CommentChange> =>
+  activeTab(s)?.changes ?? EMPTY_CHANGES;
+
+type Prefs = Pick<AppState, "mode" | "viewMode" | "safeMode" | "sidebarWidth">;
 
 const DEFAULT_PREFS: Prefs = {
   mode: "light",
@@ -88,10 +110,35 @@ function savePrefs(s: AppState) {
   localStorage.setItem(LS_PREFS, JSON.stringify(prefs));
 }
 
+/** Persist the open document paths + active doc so a relaunch can restore them. */
+function persistSession(s: AppState) {
+  const session = {
+    paths: s.tabs.map((t) => t.doc.path),
+    active: activeTab(s)?.doc.path ?? null,
+  };
+  try {
+    localStorage.setItem(LS_SESSION, JSON.stringify(session));
+  } catch {
+    /* ignore */
+  }
+}
+
+function loadSession(): { paths: string[]; active: string | null } {
+  try {
+    const raw = localStorage.getItem(LS_SESSION);
+    if (raw) {
+      const s = JSON.parse(raw);
+      if (Array.isArray(s.paths)) return { paths: s.paths, active: s.active ?? null };
+    }
+  } catch {
+    /* ignore */
+  }
+  return { paths: [], active: null };
+}
+
 const clampWidth = (w: number) => Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w));
 
-async function persistComments(doc: LoadedDocument | null, comments: Comment[]) {
-  if (!doc) return;
+async function persistComments(doc: LoadedDocument, comments: Comment[]) {
   const file: CommentFile = { version: 2, document: doc.path, comments };
   try {
     await platform.saveComments(doc.path, JSON.stringify(file, null, 2));
@@ -100,24 +147,41 @@ async function persistComments(doc: LoadedDocument | null, comments: Comment[]) 
   }
 }
 
+/** Apply a patch to one tab by id. */
+function patchTab(
+  set: (fn: (s: AppState) => Partial<AppState>) => void,
+  id: string,
+  updater: (t: Tab) => Partial<Tab>,
+) {
+  set((s) => ({ tabs: s.tabs.map((t) => (t.id === id ? { ...t, ...updater(t) } : t)) }));
+}
+
 export const useStore = create<AppState>((set, get) => ({
-  doc: null,
-  comments: [],
-  selectedId: null,
+  tabs: [],
+  activeTabId: null,
   ...loadPrefs(),
   showResolved: false,
-  changes: {},
-  renderNonce: 0,
 
   async loadDocument(doc) {
-    set({ doc, comments: [], selectedId: null, changes: {} });
-    set((s) => ({ renderNonce: s.renderNonce + 1 }));
+    // Re-opening an already-open document just activates its tab.
+    const existing = get().tabs.find((t) => t.doc.path === doc.path);
+    if (existing) {
+      set({ activeTabId: existing.id });
+      persistSession(get());
+      return;
+    }
+    const id = uid();
+    const tab: Tab = { id, doc, comments: [], selectedId: null, changes: {}, renderNonce: 0 };
+    set((s) => ({ tabs: [...s.tabs, tab], activeTabId: id }));
+    persistSession(get());
     // Hydrate any saved comments for this document.
     try {
       const raw = await platform.loadComments(doc.path);
       if (raw) {
         const parsed = JSON.parse(raw) as CommentFile;
-        if (Array.isArray(parsed.comments)) set({ comments: parsed.comments });
+        if (Array.isArray(parsed.comments)) {
+          patchTab(set, id, () => ({ comments: parsed.comments }));
+        }
       }
     } catch (e) {
       console.error("Failed to load comments", e);
@@ -129,30 +193,67 @@ export const useStore = create<AppState>((set, get) => ({
     if (doc) await get().loadDocument(doc);
   },
 
+  async restoreSession() {
+    if (!platform.isTauri()) return;
+    const { paths, active } = loadSession();
+    for (const p of paths) {
+      const doc = await platform.readDocument(p).catch(() => null);
+      if (doc) await get().loadDocument(doc);
+    }
+    if (active) {
+      const t = get().tabs.find((tab) => tab.doc.path === active);
+      if (t) set({ activeTabId: t.id });
+    }
+  },
+
+  closeTab(id) {
+    const { tabs, activeTabId } = get();
+    const idx = tabs.findIndex((t) => t.id === id);
+    if (idx === -1) return;
+    const next = tabs.filter((t) => t.id !== id);
+    let active = activeTabId;
+    if (activeTabId === id) {
+      active = next.length ? next[Math.min(idx, next.length - 1)].id : null;
+    }
+    set({ tabs: next, activeTabId: active });
+    persistSession(get());
+  },
+
+  setActiveTab(id) {
+    set({ activeTabId: id });
+    persistSession(get());
+  },
+
+  reloadTabByPath(path, source) {
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        t.doc.path === path
+          ? { ...t, doc: { ...t.doc, source }, renderNonce: t.renderNonce + 1 }
+          : t,
+      ),
+    }));
+  },
+
   addComment(anchor, body) {
+    const tab = activeTab(get());
+    if (!tab) return "";
     const id = uid();
     const now = new Date().toISOString();
-    const { comments, doc } = get();
+    const { doc, comments } = tab;
     const color = HIGHLIGHT_COLORS[comments.length % HIGHLIGHT_COLORS.length];
-    const baseline = doc
-      ? {
-          docHash: hashSource(doc.source),
-          sourceText:
-            anchor.sourceLineStart != null
-              ? sliceSourceLines(
-                  doc.source,
-                  anchor.sourceLineStart,
-                  anchor.sourceLineEnd ?? anchor.sourceLineStart,
-                )
-              : anchor.quote,
-          lineStart: anchor.sourceLineStart,
-          lineEnd: anchor.sourceLineEnd,
-          capturedAt: now,
-        }
-      : undefined;
+    const baseline = {
+      docHash: hashSource(doc.source),
+      sourceText:
+        anchor.sourceLineStart != null
+          ? sliceSourceLines(doc.source, anchor.sourceLineStart, anchor.sourceLineEnd ?? anchor.sourceLineStart)
+          : anchor.quote,
+      lineStart: anchor.sourceLineStart,
+      lineEnd: anchor.sourceLineEnd,
+      capturedAt: now,
+    };
     const comment: Comment = {
       id,
-      documentPath: doc?.path ?? "untitled",
+      documentPath: doc.path,
       createdAt: now,
       updatedAt: now,
       body,
@@ -162,17 +263,19 @@ export const useStore = create<AppState>((set, get) => ({
       baseline,
     };
     const next = [...comments, comment];
-    set({ comments: next, selectedId: id });
+    patchTab(set, tab.id, () => ({ comments: next, selectedId: id }));
     persistComments(doc, next);
     return id;
   },
 
   importComments(list) {
-    const { comments, doc } = get();
+    const tab = activeTab(get());
+    if (!tab) return 0;
+    const { doc, comments } = tab;
     const now = new Date().toISOString();
     const added: Comment[] = list.map((c, idx) => ({
       id: uid(),
-      documentPath: doc?.path ?? "untitled",
+      documentPath: doc.path,
       createdAt: now,
       updatedAt: now,
       body: c.body,
@@ -181,55 +284,64 @@ export const useStore = create<AppState>((set, get) => ({
       anchor: c.anchor,
     }));
     const next = [...comments, ...added];
-    set({ comments: next });
+    patchTab(set, tab.id, () => ({ comments: next }));
     persistComments(doc, next);
     return added.length;
   },
 
   updateComment(id, patch) {
-    const { comments, doc } = get();
-    const next = comments.map((c) =>
+    const tab = activeTab(get());
+    if (!tab) return;
+    const next = tab.comments.map((c) =>
       c.id === id ? { ...c, ...patch, updatedAt: new Date().toISOString() } : c,
     );
-    set({ comments: next });
-    persistComments(doc, next);
+    patchTab(set, tab.id, () => ({ comments: next }));
+    persistComments(tab.doc, next);
   },
 
   resolveAsAddressed(id) {
-    const { comments, doc, changes } = get();
+    const tab = activeTab(get());
+    if (!tab) return;
     const now = new Date().toISOString();
-    const ch = changes[id];
-    const next = comments.map((c) => {
+    const ch = tab.changes[id];
+    const next = tab.comments.map((c) => {
       if (c.id !== id) return c;
       // Re-baseline to the current source so a reopened comment reads "untouched".
-      const baseline =
-        doc && c.baseline
-          ? {
-              ...c.baseline,
-              docHash: hashSource(doc.source),
-              sourceText: ch?.nowText ?? c.baseline.sourceText,
-              capturedAt: now,
-            }
-          : c.baseline;
+      const baseline = c.baseline
+        ? {
+            ...c.baseline,
+            docHash: hashSource(tab.doc.source),
+            sourceText: ch?.nowText ?? c.baseline.sourceText,
+            capturedAt: now,
+          }
+        : c.baseline;
       return { ...c, status: "resolved" as const, baseline, updatedAt: now };
     });
-    set({ comments: next });
-    persistComments(doc, next);
+    patchTab(set, tab.id, () => ({ comments: next }));
+    persistComments(tab.doc, next);
   },
 
   deleteComment(id) {
-    const { comments, doc, selectedId } = get();
-    const next = comments.filter((c) => c.id !== id);
-    set({ comments: next, selectedId: selectedId === id ? null : selectedId });
-    persistComments(doc, next);
+    const tab = activeTab(get());
+    if (!tab) return;
+    const next = tab.comments.filter((c) => c.id !== id);
+    patchTab(set, tab.id, (t) => ({
+      comments: next,
+      selectedId: t.selectedId === id ? null : t.selectedId,
+    }));
+    persistComments(tab.doc, next);
   },
 
   selectComment(id) {
-    set({ selectedId: id });
+    const tab = activeTab(get());
+    if (!tab) return;
+    patchTab(set, tab.id, () => ({ selectedId: id }));
   },
 
   setChanges(changes) {
-    set({ changes });
+    const tab = activeTab(get());
+    if (!tab) return;
+    patchTab(set, tab.id, () => ({ changes }));
   },
 
   setMode(mode) {
@@ -241,8 +353,11 @@ export const useStore = create<AppState>((set, get) => ({
     savePrefs(get());
   },
   toggleSafeMode() {
-    set((s) => ({ safeMode: !s.safeMode }));
-    set((s) => ({ renderNonce: s.renderNonce + 1 }));
+    set((s) => ({
+      safeMode: !s.safeMode,
+      // Re-render every open tab under the new mode.
+      tabs: s.tabs.map((t) => ({ ...t, renderNonce: t.renderNonce + 1 })),
+    }));
     savePrefs(get());
   },
   toggleShowResolved() {
@@ -253,7 +368,8 @@ export const useStore = create<AppState>((set, get) => ({
     savePrefs(get());
   },
   bumpRender() {
-    set((s) => ({ renderNonce: s.renderNonce + 1 }));
+    const tab = activeTab(get());
+    if (tab) patchTab(set, tab.id, (t) => ({ renderNonce: t.renderNonce + 1 }));
   },
 }));
 

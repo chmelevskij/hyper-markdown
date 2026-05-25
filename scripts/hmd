@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+#
+# hmd — open Markdown/MDX files in the hyper-markdown app.
+#
+#   hmd                 just focus / launch the app
+#   hmd notes.md        open one or more files (in tabs of the running window)
+#
+# Hands files to the app via macOS `open -a`, which launches it if needed and
+# reuses the running instance otherwise.
+#
+set -euo pipefail
+
+APP="hyper-markdown"
+
+if [ "$#" -eq 0 ]; then
+  open -a "$APP"
+  exit 0
+fi
+
+paths=()
+for f in "$@"; do
+  if [ -e "$f" ]; then
+    dir="$(cd "$(dirname "$f")" && pwd)"
+    paths+=("$dir/$(basename "$f")")
+  else
+    echo "hmd: no such file: $f" >&2
+  fi
+done
+
+if [ "${#paths[@]}" -gt 0 ]; then
+  open -a "$APP" "${paths[@]}"
+fi

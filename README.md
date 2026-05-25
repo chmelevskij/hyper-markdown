@@ -17,6 +17,10 @@ agent can act on your review precisely.
   as agent-ready Markdown (or JSON) to the clipboard or a `.comments.md` file.
 - **Import comments** — read an exported `.md`/`.json` (or a sidecar file) back in;
   comments re-anchor to the current document by their quoted text.
+- **Tabs** — open multiple documents at once; each tab keeps its own comments, review
+  state, and selection. Re-opening a file just activates its tab.
+- **Live reload** — edits to an open file (from any editor) refresh the view instantly,
+  and `edited` flags update live. The `hmd` CLI opens files in the running window.
 - **Reading / Comment modes** — toggle between a plain themed reader and the full
   highlight-and-annotate experience (with a resizable comment sidebar).
 - **Addressed tracking** — each comment snapshots the source it was made against;
@@ -63,8 +67,19 @@ pnpm app:install        # builds, then (re)installs into /Applications and relau
 ```
 
 This quits any running copy, replaces `/Applications/hyper-markdown.app` with a
-fresh release build, and opens it. On other platforms, run `pnpm app:build` and
-grab the bundle from `src-tauri/target/release/bundle/`.
+fresh release build, opens it, and installs the `hmd` CLI onto your PATH
+(`/usr/local/bin`, falling back to `~/.local/bin`). On other platforms, run
+`pnpm app:build` and grab the bundle from `src-tauri/target/release/bundle/`.
+
+### `hmd` CLI
+
+```bash
+hmd notes.md docs/spec.mdx   # open files (in tabs of the running window)
+hmd                          # just focus / launch the app
+```
+
+`hmd` hands files to the app via macOS `open -a`, so it launches the app if needed
+and reuses the running window otherwise.
 
 ## Architecture
 

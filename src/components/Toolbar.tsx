@@ -1,7 +1,7 @@
-import { useStore } from "../store/useStore";
+import { useStore, activeTab } from "../store/useStore";
 
 export default function Toolbar() {
-  const doc = useStore((s) => s.doc);
+  const doc = useStore((s) => activeTab(s)?.doc ?? null);
   const mode = useStore((s) => s.mode);
   const viewMode = useStore((s) => s.viewMode);
   const safeMode = useStore((s) => s.safeMode);

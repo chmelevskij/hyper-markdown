@@ -121,6 +121,83 @@ export const platform = {
     return isTauri() ? tauriOpenDocument() : browserPickFile();
   },
 
+  /** Read a document by absolute path (Tauri only; browser can't re-read paths). */
+  async readDocument(path: string): Promise<LoadedDocument | null> {
+    if (!isTauri()) return null;
+    return tauriReadPath(path);
+  },
+
+  /**
+   * Watch the given document paths for external edits. Calls `onChange(path)`
+   * (debounced) when a file changes. Tauri only; returns an unsubscribe fn.
+   */
+  watchFiles(paths: string[], onChange: (path: string) => void): () => void {
+    if (!isTauri() || paths.length === 0) return () => {};
+    let cancelled = false;
+    let teardown = () => {};
+    const timers = new Map<string, ReturnType<typeof setTimeout>>();
+    const debounced = (p: string) => {
+      clearTimeout(timers.get(p));
+      timers.set(p, setTimeout(() => onChange(p), 150));
+    };
+    (async () => {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const { listen } = await import("@tauri-apps/api/event");
+      for (const p of paths) {
+        try {
+          await invoke("watch_file", { path: p });
+        } catch (e) {
+          console.error("watch_file failed", e);
+        }
+      }
+      const unlisten = await listen<string>("file-changed", (e) => {
+        if (typeof e.payload === "string" && paths.includes(e.payload)) debounced(e.payload);
+      });
+      if (cancelled) {
+        unlisten();
+        return;
+      }
+      teardown = () => {
+        unlisten();
+        for (const p of paths) invoke("unwatch_file", { path: p }).catch(() => {});
+        timers.forEach((t) => clearTimeout(t));
+      };
+    })();
+    return () => {
+      cancelled = true;
+      teardown();
+    };
+  },
+
+  /**
+   * Subscribe to documents the OS hands us (the `hmd` CLI / Finder open).
+   * Drains any files captured before the listener attached. Tauri only.
+   */
+  onOpenFile(cb: (doc: LoadedDocument) => void): () => void {
+    if (!isTauri()) return () => {};
+    let unlisten = () => {};
+    (async () => {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const { listen } = await import("@tauri-apps/api/event");
+      try {
+        const pending = await invoke<string[]>("take_pending_files");
+        for (const p of pending ?? []) cb(await tauriReadPath(p));
+      } catch (e) {
+        console.error("take_pending_files failed", e);
+      }
+      unlisten = await listen<string>("open-file", async (e) => {
+        if (typeof e.payload === "string") {
+          try {
+            cb(await tauriReadPath(e.payload));
+          } catch (err) {
+            console.error("open-file read failed", err);
+          }
+        }
+      });
+    })();
+    return () => unlisten();
+  },
+
   importTextFile(): Promise<{ name: string; text: string } | null> {
     if (isTauri()) return tauriImportTextFile();
     return new Promise((resolve) => {

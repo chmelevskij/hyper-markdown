@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useStore } from "../store/useStore";
+import { useStore, activeTab, activeComments, activeChanges } from "../store/useStore";
 import { platform } from "../platform";
 import { toJSON, toMarkdown } from "../lib/export";
 import { parseImport } from "../lib/importComments";
@@ -12,7 +12,7 @@ const CHANGE_LABEL: Record<CommentChange["state"], string> = {
 };
 
 function CommentCard({ comment, change }: { comment: Comment; change?: CommentChange }) {
-  const selectedId = useStore((s) => s.selectedId);
+  const selectedId = useStore((s) => activeTab(s)?.selectedId ?? null);
   const selectComment = useStore((s) => s.selectComment);
   const updateComment = useStore((s) => s.updateComment);
   const resolveAsAddressed = useStore((s) => s.resolveAsAddressed);
@@ -131,9 +131,9 @@ function CommentCard({ comment, change }: { comment: Comment; change?: CommentCh
 type Filter = "all" | "review";
 
 export default function CommentSidebar({ width }: { width: number }) {
-  const doc = useStore((s) => s.doc);
-  const comments = useStore((s) => s.comments);
-  const changes = useStore((s) => s.changes);
+  const doc = useStore((s) => activeTab(s)?.doc ?? null);
+  const comments = useStore(activeComments);
+  const changes = useStore(activeChanges);
   const showResolved = useStore((s) => s.showResolved);
   const toggleShowResolved = useStore((s) => s.toggleShowResolved);
   const setViewMode = useStore((s) => s.setViewMode);
