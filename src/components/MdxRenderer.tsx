@@ -31,12 +31,23 @@ const components: MDXComponents = {
   a(props: Record<string, unknown>) {
     const href = props.href as string | undefined;
     const isExternal = !!href && /^https?:\/\//.test(href);
+    const isAnchor = !!href && href.startsWith("#");
     return (
       <a
         {...(props as object)}
         target={isExternal ? "_blank" : undefined}
         rel={isExternal ? "noreferrer" : undefined}
         onClick={(e) => {
+          if (isAnchor) {
+            // In-page anchor: scroll the heading into its scroll container instead
+            // of relying on default hash navigation (which the SPA doesn't honor).
+            const target = document.getElementById(decodeURIComponent(href!.slice(1)));
+            if (target) {
+              e.preventDefault();
+              target.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+            return;
+          }
           if (isExternal && platform.isTauri()) {
             e.preventDefault();
             import("@tauri-apps/plugin-opener").then((m) => m.openUrl(href!)).catch(() => {});

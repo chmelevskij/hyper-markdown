@@ -7,6 +7,7 @@ import rehypeKatex from "rehype-katex";
 import type { MDXComponents } from "mdx/types";
 import type { ComponentType } from "react";
 import rehypeSourceLine from "./rehypeSourceLine";
+import rehypeHeadingIds from "./rehypeHeadingIds";
 
 export interface CompileOptions {
   /** `mdx` enables JSX/expressions; `md` is plain CommonMark (also used for safe mode). */
@@ -28,7 +29,7 @@ export async function compileDocument(
     ...runtime,
     format,
     remarkPlugins: [remarkFrontmatter, remarkGfm, remarkMath],
-    rehypePlugins: [rehypeKatex, rehypeSourceLine],
+    rehypePlugins: [rehypeKatex, rehypeHeadingIds, rehypeSourceLine],
     development: false,
   });
   return Content as MDXContent;
