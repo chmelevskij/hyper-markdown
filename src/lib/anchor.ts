@@ -95,10 +95,33 @@ function rangeFromOffsets(root: HTMLElement, start: number, end: number): Range 
  * Resolve an anchor to a Range in the current DOM. Tries the stored offsets
  * first (validated against the quote), then falls back to a prefix/quote/suffix
  * text search so highlights survive small edits and re-renders.
+ *
+ * Single-shot convenience — when resolving more than one anchor against the
+ * same root, prefer `createResolver` so the (expensive) `root.textContent` read
+ * and per-anchor results are shared.
  */
 export function resolveRange(root: HTMLElement, anchor: Anchor): Range | null {
-  const full = root.textContent ?? "";
+  return resolveAgainstText(root, root.textContent ?? "", anchor);
+}
 
+/**
+ * Batched anchor resolver. Reads `root.textContent` once and memoizes the
+ * resolved Range per anchor (by object identity) for the resolver's lifetime —
+ * a single React render pass that resolves N comments goes from N full-document
+ * text reads + N TreeWalker traversals to one of each (plus per-anchor work).
+ */
+export function createResolver(root: HTMLElement): (anchor: Anchor) => Range | null {
+  const full = root.textContent ?? "";
+  const cache = new Map<Anchor, Range | null>();
+  return (anchor) => {
+    if (cache.has(anchor)) return cache.get(anchor) ?? null;
+    const range = resolveAgainstText(root, full, anchor);
+    cache.set(anchor, range);
+    return range;
+  };
+}
+
+function resolveAgainstText(root: HTMLElement, full: string, anchor: Anchor): Range | null {
   // Fast path: stored offsets still point at the same text.
   if (full.slice(anchor.start, anchor.end) === anchor.quote) {
     return rangeFromOffsets(root, anchor.start, anchor.end);

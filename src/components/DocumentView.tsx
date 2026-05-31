@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore, HIGHLIGHT_COLORS, activeTab, activeComments } from "../store/useStore";
-import { captureAnchor, resolveRange, sourceLinesForRange } from "../lib/anchor";
+import { captureAnchor, createResolver, resolveRange, sourceLinesForRange } from "../lib/anchor";
 import { hashSource, normalizeForCompare, sliceSourceLines } from "../lib/changes";
 import type { Anchor, CommentChange } from "../types";
 import MdxRenderer from "./MdxRenderer";
@@ -38,11 +38,12 @@ export default function DocumentView() {
       return;
     }
     const root = rootRef.current;
+    const resolve = createResolver(root);
     const buckets = HIGHLIGHT_COLORS.map(() => new Highlight());
     const active = new Highlight();
     for (const c of comments) {
       if (c.status === "resolved" && !useStore.getState().showResolved) continue;
-      const range = resolveRange(root, c.anchor);
+      const range = resolve(c.anchor);
       if (!range) continue;
       if (c.id === selectedId) {
         active.add(range);
@@ -61,6 +62,7 @@ export default function DocumentView() {
     if (!root || !doc) return;
     const source = doc.source;
     const curHash = hashSource(source);
+    const resolve = createResolver(root);
     const map: Record<string, CommentChange> = {};
     for (const c of comments) {
       const b = c.baseline;
@@ -69,7 +71,7 @@ export default function DocumentView() {
         map[c.id] = { state: "untouched" };
         continue;
       }
-      const range = resolveRange(root, c.anchor);
+      const range = resolve(c.anchor);
       if (!range) {
         map[c.id] =
           b.sourceText && source.includes(b.sourceText)
@@ -150,8 +152,9 @@ export default function DocumentView() {
       const caret =
         document.caretRangeFromPoint?.(e.clientX, e.clientY) ?? null;
       if (!caret) return;
+      const resolve = createResolver(root);
       for (const c of comments) {
-        const range = resolveRange(root, c.anchor);
+        const range = resolve(c.anchor);
         if (range && range.comparePoint(caret.startContainer, caret.startOffset) === 0) {
           selectComment(c.id);
           return;
