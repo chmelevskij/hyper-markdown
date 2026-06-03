@@ -147,6 +147,23 @@ async function persistComments(doc: LoadedDocument, comments: Comment[]) {
   }
 }
 
+/** Shallow value-equality for a comment-change map (avoids needless renders). */
+function changesEqual(
+  a: Record<string, CommentChange>,
+  b: Record<string, CommentChange>,
+): boolean {
+  const ak = Object.keys(a);
+  if (ak.length !== Object.keys(b).length) return false;
+  for (const k of ak) {
+    const x = a[k];
+    const y = b[k];
+    if (!y || x.state !== y.state || x.wasText !== y.wasText || x.nowText !== y.nowText) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /** Apply a patch to one tab by id. */
 function patchTab(
   set: (fn: (s: AppState) => Partial<AppState>) => void,
@@ -341,6 +358,9 @@ export const useStore = create<AppState>((set, get) => ({
   setChanges(changes) {
     const tab = activeTab(get());
     if (!tab) return;
+    // Bail when nothing changed so we don't allocate a new tabs array (which
+    // would re-render App → DocumentView and risk a reclassify feedback loop).
+    if (changesEqual(tab.changes, changes)) return;
     patchTab(set, tab.id, () => ({ changes }));
   },
 
