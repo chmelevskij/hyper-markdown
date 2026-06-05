@@ -473,6 +473,26 @@ body {
 .change-diff__now { background: rgba(133, 153, 0, 0.16); }
 .change-diff__resolve { width: 100%; justify-content: center; margin-top: 4px; }
 
+/* ---- Link hover preview (status-bar style) ---- */
+.link-preview {
+  position: fixed;
+  bottom: 8px;
+  left: 8px;
+  z-index: 40;
+  max-width: 60vw;
+  padding: 4px 8px;
+  background: var(--surface);
+  border: var(--border-w) solid var(--border);
+  box-shadow: 3px 3px 0 var(--shadow);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
 /* ---- Toast ---- */
 .toast {
   position: absolute;

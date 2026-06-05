@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore, HIGHLIGHT_COLORS, activeTab, activeComments } from "../store/useStore";
 import { captureAnchor, createResolver, resolveRange, sourceLinesForRange } from "../lib/anchor";
 import { hashSource, normalizeForCompare, sliceSourceLines } from "../lib/changes";
+import { isMarkdownPath, type ResolvedTarget } from "../lib/links";
+import { platform } from "../platform";
 import type { Anchor, CommentChange } from "../types";
 import MdxRenderer from "./MdxRenderer";
 import SelectionPopover from "./SelectionPopover";
@@ -23,11 +25,13 @@ export default function DocumentView() {
   const addComment = useStore((s) => s.addComment);
   const selectComment = useStore((s) => s.selectComment);
   const setChanges = useStore((s) => s.setChanges);
+  const loadDocument = useStore((s) => s.loadDocument);
 
   const reading = viewMode === "reading";
   const rootRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [pending, setPending] = useState<PendingSelection | null>(null);
+  const [hoveredLink, setHoveredLink] = useState<string | null>(null);
 
   // Paint highlights using the CSS Custom Highlight API (no DOM mutation).
   const paintHighlights = useCallback(() => {
@@ -212,6 +216,33 @@ export default function DocumentView() {
     });
   }, [paintHighlights, classify]);
 
+  // Open a relative/absolute link target. Markdown files open as a new tab;
+  // a same-document fragment scrolls in place; anything else is handed off to
+  // the OS default handler so images, PDFs, etc. still open from a click.
+  const handleOpenTarget = useCallback(
+    async (target: ResolvedTarget) => {
+      const docPath = doc?.path;
+      if (!docPath) return;
+      if (target.path === docPath && target.fragment) {
+        const el = document.getElementById(decodeURIComponent(target.fragment));
+        el?.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+      if (isMarkdownPath(target.path)) {
+        const opened = await platform.readDocument(target.path).catch(() => null);
+        if (opened) {
+          await loadDocument(opened);
+          return;
+        }
+      }
+      if (platform.isTauri()) {
+        const url = target.path.startsWith("file://") ? target.path : `file://${target.path}`;
+        import("@tauri-apps/plugin-opener").then((m) => m.openUrl(url)).catch(() => {});
+      }
+    },
+    [doc?.path, loadDocument],
+  );
+
   if (!doc) return null;
 
   return (
@@ -230,9 +261,13 @@ export default function DocumentView() {
           source={doc.source}
           format={safeMode ? "md" : doc.format}
           nonce={renderNonce}
+          docPath={doc.path}
+          onOpenTarget={handleOpenTarget}
+          onHoverTarget={setHoveredLink}
           onRendered={handleRendered}
         />
       </article>
+      {hoveredLink && <div className="link-preview">{hoveredLink}</div>}
       {pending && (
         <SelectionPopover
           rect={pending.rect}
