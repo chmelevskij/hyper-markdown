@@ -82,6 +82,32 @@
   overflow-x: auto;
   font-family: var(--font-mono);
   line-height: 1.55;
+  /* Firefox: keep the horizontal scrollbar permanently visible. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--quote-border) transparent;
+}
+/* WebKit/Blink: force a real, always-visible (non-overlay) scrollbar so wide
+   code can be scrolled with a plain mouse. macOS otherwise hides the overlay
+   scrollbar, leaving no draggable track and no way to pan sideways. */
+.code-block pre::-webkit-scrollbar,
+.code-block.code-block--plain::-webkit-scrollbar {
+  height: 10px;
+}
+.code-block pre::-webkit-scrollbar-track,
+.code-block.code-block--plain::-webkit-scrollbar-track {
+  background: transparent;
+}
+.code-block pre::-webkit-scrollbar-thumb,
+.code-block.code-block--plain::-webkit-scrollbar-thumb {
+  background: var(--quote-border);
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.code-block pre::-webkit-scrollbar-thumb:hover,
+.code-block.code-block--plain::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+  background-clip: content-box;
 }
 /* Shiki sets its own bg via inline styles; align padding/scroll. */
 .code-block pre.shiki { padding: 14px 16px; }

@@ -96,6 +96,30 @@ export default function DocumentView() {
     classify();
   }, [paintHighlights, classify, renderNonce]);
 
+  // Re-resolve highlights whenever the rendered content mutates. Async renders
+  // (Shiki syntax highlighting, Mermaid diagrams) replace their nodes *after*
+  // the initial commit — which collapses any live highlight Range captured
+  // beforehand, so the annotation has to be re-resolved against the new DOM.
+  const repaintRef = useRef<() => void>(() => {});
+  repaintRef.current = () => {
+    paintHighlights();
+    classify();
+  };
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    let raf = 0;
+    const observer = new MutationObserver(() => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => repaintRef.current());
+    });
+    observer.observe(root, { childList: true, subtree: true, characterData: true });
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(raf);
+    };
+  }, []);
+
   // Scroll the selected comment's anchor into view (e.g. clicked in the sidebar).
   // Skips when the anchor is already fully visible to avoid jarring jumps —
   // notably when the selection originated from clicking the highlight itself.
@@ -177,6 +201,17 @@ export default function DocumentView() {
     }
   };
 
+  // Stable so MdxRenderer's commit effect only fires when the content actually
+  // changes. An inline arrow here would change identity on every render and,
+  // because classify() writes a fresh `changes` map (new tabs array → App
+  // re-render → DocumentView re-render), spin a 60fps render loop.
+  const handleRendered = useCallback(() => {
+    requestAnimationFrame(() => {
+      paintHighlights();
+      classify();
+    });
+  }, [paintHighlights, classify]);
+
   if (!doc) return null;
 
   return (
@@ -195,12 +230,7 @@ export default function DocumentView() {
           source={doc.source}
           format={safeMode ? "md" : doc.format}
           nonce={renderNonce}
-          onRendered={() =>
-            requestAnimationFrame(() => {
-              paintHighlights();
-              classify();
-            })
-          }
+          onRendered={handleRendered}
         />
       </article>
       {pending && (
