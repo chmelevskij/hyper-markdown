@@ -1,54 +1,64 @@
-/* Single neobrutalist theme on a Solarized palette, keyed by [data-mode] on <html>.
-   Light = Solarized Light, dark = Solarized Dark. Neobrutalism comes from the
-   chrome: hard square borders + offset drop-shadows (see app.css). */
+/* "Scandinavian instrument panel" — a Polestar-inspired theme, keyed by
+   [data-mode] on <html>. Monochrome chrome on warm paper (light) or soot
+   (dark), hairline borders, and a cobalt-blue accent carried through links,
+   active states and the annotation selection. The chrome stays out of the
+   document's way. */
 
 :root {
-  --radius: 0px;
-  --radius-sm: 0px;
-  --border-w: 2px;
-  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --radius: 2px;
+  --radius-sm: 2px;
+  --border-w: 1px;
+  --font-ui: "Hanken Grotesk Variable", "Hanken Grotesk", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-body: "Hanken Grotesk Variable", "Hanken Grotesk", "Helvetica Neue", Helvetica, Arial, sans-serif;
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
 
-  /* Highlight palette — translucent Solarized accents so text stays readable. */
-  --hl-0: rgba(181, 137, 0, 0.40);   /* yellow */
-  --hl-1: rgba(42, 161, 152, 0.38);  /* cyan */
-  --hl-2: rgba(38, 139, 210, 0.34);  /* blue */
-  --hl-3: rgba(211, 54, 130, 0.34);  /* magenta */
-  --hl-4: rgba(108, 113, 196, 0.40); /* violet */
-  --hl-active: rgba(203, 75, 22, 0.55); /* orange */
+  /* Annotation palette — desaturated wash tones so marked text reads calmly. */
+  --hl-0: rgba(196, 150, 58, 0.26);  /* ochre */
+  --hl-1: rgba(110, 142, 128, 0.28); /* sage */
+  --hl-2: rgba(104, 128, 156, 0.26); /* slate */
+  --hl-3: rgba(168, 110, 122, 0.26); /* dusk rose */
+  --hl-4: rgba(126, 118, 158, 0.26); /* heather */
+  --hl-active: rgba(64, 112, 229, 0.30); /* cobalt — the accent */
 }
 
-/* ---- Solarized Light ---- */
+/* ---- Light: warm paper ---- */
 [data-mode="light"] {
-  --bg: #fdf6e3;        /* base3 */
-  --surface: #fdf6e3;   /* base3 */
-  --surface-2: #eee8d5; /* base2 */
-  --fg: #073642;        /* base02 — punchy near-black teal */
-  --muted: #657b83;     /* base00 */
-  --border: #073642;    /* base02 — dark neobrutalist border */
-  --shadow: #073642;    /* hard offset shadow matches the border */
-  --accent: #268bd2;    /* blue */
-  --accent-fg: #fdf6e3; /* text on accent */
-  --link: #268bd2;
-  --code-bg: #eee8d5;
-  --quote-border: #93a1a1; /* base1 */
+  color-scheme: light;
+  --bg: #fafaf8;
+  --surface: #ffffff;
+  --surface-2: #f2f2ef;
+  --fg: #161616;
+  --muted: #757571;
+  --border: #e4e4e0;     /* hairline */
+  --border-strong: #161616;
+  --shadow: rgba(22, 22, 22, 0.07);
+  --accent: #2255d4;     /* cobalt blue */
+  --accent-fg: #ffffff;
+  --ink: #161616;        /* secondary-action fill (Polestar's black button) */
+  --ink-fg: #fafaf8;
+  --link: #2255d4;
+  --code-bg: #f2f2ef;
+  --quote-border: #d4d4cf;
 }
 
-/* ---- Solarized Dark ---- */
+/* ---- Dark: soot ---- */
 [data-mode="dark"] {
-  --bg: #002b36;        /* base03 */
-  --surface: #073642;   /* base02 */
-  --surface-2: #073642; /* base02 */
-  --fg: #93a1a1;        /* base1 — bright text for contrast */
-  --muted: #657b83;     /* base00 */
-  --border: #93a1a1;    /* base1 — light neobrutalist border on dark */
-  --shadow: #93a1a1;    /* light hard offset shadow pops on dark */
-  --accent: #268bd2;    /* blue */
-  --accent-fg: #002b36;
-  --link: #2aa198;      /* cyan reads better than blue on base03 */
-  --code-bg: #002b36;
-  --quote-border: #586e75; /* base01 */
+  color-scheme: dark;
+  --bg: #0f0f0e;
+  --surface: #161615;
+  --surface-2: #1d1d1b;
+  --fg: #e9e9e6;
+  --muted: #8f8f8a;
+  --border: #2b2b28;     /* hairline */
+  --border-strong: #e9e9e6;
+  --shadow: rgba(0, 0, 0, 0.45);
+  --accent: #7da3f5;
+  --accent-fg: #0f0f0e;
+  --ink: #e9e9e6;        /* inverted secondary on dark */
+  --ink-fg: #0f0f0e;
+  --link: #7da3f5;
+  --code-bg: #161615;
+  --quote-border: #3a3a36;
 }
 
 /* ---- Custom Highlight API painting ---- */
@@ -61,4 +71,6 @@
   background-color: var(--hl-active);
   text-decoration: underline;
   text-decoration-color: var(--accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
 }

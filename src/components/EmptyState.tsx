@@ -46,7 +46,9 @@ export default function EmptyState() {
   return (
     <div className="empty">
       <div className="empty__card">
-        <h1>◆ hyper-markdown</h1>
+        <h1>
+          <span className="brand__mark">◆</span> hyper-markdown
+        </h1>
         <p>Render Markdown &amp; MDX, highlight passages, and export comments for your AI agent.</p>
         <div className="empty__actions">
           <button className="btn btn--primary" onClick={openDocument}>

@@ -13,7 +13,9 @@ export default function Toolbar() {
   return (
     <header className="toolbar">
       <div className="toolbar__left">
-        <span className="brand">◆ hyper-markdown</span>
+        <span className="brand">
+          <span className="brand__mark">◆</span> hyper-markdown
+        </span>
         {doc && (
           <span className="toolbar__doc" title={doc.path}>
             {doc.name}

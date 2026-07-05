@@ -13,6 +13,7 @@
     "comments": "node .claude/skills/hmd-comments/digest.mjs"
   },
   "dependencies": {
+    "@fontsource-variable/hanken-grotesk": "^5.2.8",
     "@mdx-js/mdx": "^3.1.1",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2.7.1",

@@ -24,7 +24,7 @@ const PRELOADED_LANGS = [
   "sql",
 ];
 
-export const CODE_THEMES = { light: "github-light", dark: "github-dark" } as const;
+export const CODE_THEMES = { light: "min-light", dark: "min-dark" } as const;
 
 async function getHighlighter(): Promise<HighlighterCore> {
   if (!highlighterPromise) {

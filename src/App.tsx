@@ -7,6 +7,7 @@ import DocumentView from "./components/DocumentView";
 import CommentSidebar from "./components/CommentSidebar";
 import SidebarSplitter from "./components/SidebarSplitter";
 import EmptyState from "./components/EmptyState";
+import "@fontsource-variable/hanken-grotesk";
 import "./styles/themes.css";
 import "./styles/app.css";
 import "./styles/markdown.css";

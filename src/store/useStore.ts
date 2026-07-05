@@ -9,13 +9,14 @@ export type Mode = "light" | "dark";
 /** Reading = plain reader; comment = highlight + annotate with the sidebar. */
 export type ViewMode = "reading" | "comment";
 
-/** Solarized accent hues, used for comment swatches + highlight buckets. */
+/** Solid counterparts of the --hl-0..4 wash tones in themes.css, used for
+    comment swatches + highlight buckets. */
 export const HIGHLIGHT_COLORS = [
-  "#b58900", // yellow
-  "#2aa198", // cyan
-  "#268bd2", // blue
-  "#d33682", // magenta
-  "#6c71c4", // violet
+  "#c4963a", // ochre
+  "#6e8e80", // sage
+  "#68809c", // slate
+  "#a86e7a", // dusk rose
+  "#7e769e", // heather
 ];
 
 /** One open document and all of its per-document state. */
