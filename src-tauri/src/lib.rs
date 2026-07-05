@@ -87,12 +87,94 @@ fn take_pending_files(state: tauri::State<PendingFiles>) -> Vec<String> {
     std::mem::take(&mut *state.0.lock().unwrap())
 }
 
+/// macOS app menu. The default Tauri menu binds ⌘W to the native
+/// "Close Window" item, which swallows the shortcut before the webview sees
+/// it — so ⌘W becomes "Close Tab" (forwarded to the frontend as a `close-tab`
+/// event) and "Close Window" moves to ⇧⌘W.
+#[cfg(target_os = "macos")]
+fn build_menu(handle: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
+    use tauri::menu::{AboutMetadata, Menu, MenuItemBuilder, SubmenuBuilder};
+
+    let pkg = handle.package_info();
+    let about = AboutMetadata {
+        name: Some(pkg.name.clone()),
+        version: Some(pkg.version.to_string()),
+        ..Default::default()
+    };
+
+    let app_menu = SubmenuBuilder::new(handle, pkg.name.clone())
+        .about(Some(about))
+        .separator()
+        .services()
+        .separator()
+        .hide()
+        .hide_others()
+        .show_all()
+        .separator()
+        .quit()
+        .build()?;
+
+    let close_tab = MenuItemBuilder::with_id("close-tab", "Close Tab")
+        .accelerator("Cmd+W")
+        .build(handle)?;
+    let close_window = MenuItemBuilder::with_id("close-window", "Close Window")
+        .accelerator("Shift+Cmd+W")
+        .build(handle)?;
+    let file_menu = SubmenuBuilder::new(handle, "File")
+        .item(&close_tab)
+        .item(&close_window)
+        .build()?;
+
+    let edit_menu = SubmenuBuilder::new(handle, "Edit")
+        .undo()
+        .redo()
+        .separator()
+        .cut()
+        .copy()
+        .paste()
+        .select_all()
+        .build()?;
+
+    let view_menu = SubmenuBuilder::new(handle, "View").fullscreen().build()?;
+
+    let window_menu = SubmenuBuilder::new(handle, "Window")
+        .minimize()
+        .maximize()
+        .build()?;
+
+    Menu::with_items(
+        handle,
+        &[&app_menu, &file_menu, &edit_menu, &view_menu, &window_menu],
+    )
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_fs::init());
+
+    #[cfg(target_os = "macos")]
+    let builder = builder
+        .menu(build_menu)
+        .on_menu_event(|app, event| match event.id().as_ref() {
+            "close-tab" => {
+                let _ = app.emit("close-tab", ());
+            }
+            "close-window" => {
+                let focused = app
+                    .webview_windows()
+                    .into_values()
+                    .find(|w| w.is_focused().unwrap_or(false));
+                if let Some(win) = focused.or_else(|| app.get_webview_window("main")) {
+                    let _ = win.close();
+                }
+            }
+            _ => {}
+        });
+
+    builder
         .manage(Watchers::default())
         .manage(PendingFiles::default())
         .invoke_handler(tauri::generate_handler![

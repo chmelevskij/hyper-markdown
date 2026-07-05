@@ -32,6 +32,18 @@ export default function App() {
   // Global file-drop (Tauri OS drop or browser drag-drop).
   useEffect(() => platform.onFileDrop(loadDocument), [loadDocument]);
 
+  // ⌘W (native File ▸ Close Tab): close the active tab, or the window
+  // once no tabs remain.
+  useEffect(
+    () =>
+      platform.onCloseTab(() => {
+        const { activeTabId, closeTab } = useStore.getState();
+        if (activeTabId) closeTab(activeTabId);
+        else platform.closeWindow();
+      }),
+    [],
+  );
+
   // Restore the previous session, then open files handed to us by the OS
   // (the `hmd` CLI / Finder) for the lifetime of the app.
   useEffect(() => {

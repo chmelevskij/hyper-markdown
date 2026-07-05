@@ -198,6 +198,28 @@ export const platform = {
     return () => unlisten();
   },
 
+  /**
+   * Subscribe to the native File ▸ Close Tab menu item (⌘W). Tauri/macOS
+   * only — in the browser ⌘W belongs to the browser itself. Returns an
+   * unsubscribe fn.
+   */
+  onCloseTab(cb: () => void): () => void {
+    if (!isTauri()) return () => {};
+    let unlisten = () => {};
+    (async () => {
+      const { listen } = await import("@tauri-apps/api/event");
+      unlisten = await listen("close-tab", () => cb());
+    })();
+    return () => unlisten();
+  },
+
+  /** Close the current native window (Tauri only). */
+  async closeWindow(): Promise<void> {
+    if (!isTauri()) return;
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    await getCurrentWindow().close();
+  },
+
   importTextFile(): Promise<{ name: string; text: string } | null> {
     if (isTauri()) return tauriImportTextFile();
     return new Promise((resolve) => {
