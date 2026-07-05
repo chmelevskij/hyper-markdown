@@ -3,6 +3,7 @@
  * hmd-comments digest — a token-efficient view over hyper-markdown sidecars.
  *
  *   node digest.mjs [list] [dir] [--all]   list open (or all) comments
+ *   node digest.mjs reply <id> <text>      append a reply to a comment's body
  *   node digest.mjs resolve <id> [dir]     mark a comment resolved + re-baseline
  *
  * Reference-only by design: it prints file + line range + note, never the
@@ -160,15 +161,56 @@ function cmdResolve(idPrefix, dir) {
   console.log(`Resolved [${String(comment.id).slice(0, 8)}] in ${rel.split(sep).join("/")}.`);
 }
 
+function cmdReply(idPrefix, text, dir) {
+  if (!idPrefix || !text) {
+    console.error('Usage: digest.mjs reply <id> "<text>"');
+    process.exit(2);
+  }
+  const sidecars = findSidecars(dir);
+  const matches = [];
+  for (const sc of sidecars) {
+    const file = loadSidecar(sc);
+    if (!file) continue;
+    for (const c of file.comments) {
+      if (String(c.id).startsWith(idPrefix)) matches.push({ sc, file, comment: c });
+    }
+  }
+
+  if (matches.length === 0) {
+    console.error(`No comment id starts with "${idPrefix}".`);
+    process.exit(1);
+  }
+  if (matches.length > 1) {
+    console.error(`Ambiguous id "${idPrefix}" — matches ${matches.length} comments. Use a longer prefix.`);
+    process.exit(1);
+  }
+
+  const { sc, file, comment } = matches[0];
+  const now = new Date().toISOString();
+  // Append as a visually distinct reply marker. The hmd sidebar renders body as
+  // pre-wrap text, so the blank line + arrow make the reply read as a thread.
+  const reply = `↳ Claude: ${text}`;
+  comment.body = comment.body ? `${comment.body.replace(/\s+$/, "")}\n\n${reply}` : reply;
+  comment.updatedAt = now;
+
+  file.version = 2;
+  writeFileSync(sc, `${JSON.stringify(file, null, 2)}\n`);
+  const rel = relative(process.cwd(), docPathFor(sc)) || docPathFor(sc);
+  console.log(`Replied to [${String(comment.id).slice(0, 8)}] in ${rel.split(sep).join("/")}.`);
+}
+
 // ---- entry ----------------------------------------------------------------
 
 const args = process.argv.slice(2);
 const includeResolved = args.includes("--all");
 const positional = args.filter((a) => !a.startsWith("--"));
-const cmd = positional[0] === "list" || positional[0] === "resolve" ? positional[0] : "list";
+const KNOWN = new Set(["list", "reply", "resolve"]);
+const cmd = KNOWN.has(positional[0]) ? positional[0] : "list";
 
 if (cmd === "resolve") {
   cmdResolve(positional[1], positional[2] || process.cwd());
+} else if (cmd === "reply") {
+  cmdReply(positional[1], positional[2], positional[3] || process.cwd());
 } else {
   // `list [dir]` or just `[dir]`
   const dir = positional[0] === "list" ? positional[1] || process.cwd() : positional[0] || process.cwd();
