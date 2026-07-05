@@ -9,7 +9,7 @@ async function ensureMermaid(mode: "light" | "dark") {
   mermaid.initialize({
     startOnLoad: false,
     securityLevel: "strict",
-    theme: mode === "dark" ? "dark" : "default",
+    theme: mode === "dark" ? "dark" : "neutral",
   });
   initialized = true;
   return mermaid;
@@ -24,6 +24,9 @@ function MermaidViewer({ svg, onClose }: { svg: string; onClose: () => void }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
+  /** True once the pointer has moved past a small threshold since pointerdown,
+   *  so the trailing click after a pan-drag doesn't get treated as a backdrop tap. */
+  const draggedRef = useRef(false);
   const [scale, setScale] = useState(1);
   const [tx, setTx] = useState(0);
   const [ty, setTy] = useState(0);
@@ -80,15 +83,34 @@ function MermaidViewer({ svg, onClose }: { svg: string; onClose: () => void }) {
   const onPointerDown = (e: React.PointerEvent) => {
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
     dragRef.current = { x: e.clientX, y: e.clientY, tx, ty };
+    draggedRef.current = false;
   };
   const onPointerMove = (e: React.PointerEvent) => {
     const d = dragRef.current;
     if (!d) return;
+    if (
+      !draggedRef.current &&
+      (Math.abs(e.clientX - d.x) > 3 || Math.abs(e.clientY - d.y) > 3)
+    ) {
+      draggedRef.current = true;
+    }
     setTx(d.tx + (e.clientX - d.x));
     setTy(d.ty + (e.clientY - d.y));
   };
   const onPointerUp = () => {
     dragRef.current = null;
+  };
+
+  // Let backdrop taps close the viewer. We only swallow the click when it was
+  // really a drag, or when it landed on the diagram itself.
+  const onStageClick = (e: React.MouseEvent) => {
+    if (draggedRef.current) {
+      e.stopPropagation();
+      return;
+    }
+    if (contentRef.current?.contains(e.target as Node)) {
+      e.stopPropagation();
+    }
   };
 
   return createPortal(
@@ -106,7 +128,7 @@ function MermaidViewer({ svg, onClose }: { svg: string; onClose: () => void }) {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        onClick={(e) => e.stopPropagation()}
+        onClick={onStageClick}
       >
         <div
           ref={contentRef}
