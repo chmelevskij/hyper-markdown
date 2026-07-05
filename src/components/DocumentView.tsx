@@ -15,6 +15,14 @@ interface PendingSelection {
 
 const supportsHighlights = typeof CSS !== "undefined" && "highlights" in CSS;
 
+/**
+ * Last-known scroll position per tab. Module-scoped so it survives the
+ * DocumentView remount that App triggers (`key={activeTabId}`) whenever the
+ * active tab flips — without that, switching tabs (e.g. by opening a relative
+ * link in a new tab) would always slam the previous tab back to the top.
+ */
+const scrollCache = new Map<string, number>();
+
 export default function DocumentView() {
   const doc = useStore((s) => activeTab(s)?.doc ?? null);
   const comments = useStore(activeComments);
@@ -32,6 +40,12 @@ export default function DocumentView() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [pending, setPending] = useState<PendingSelection | null>(null);
   const [hoveredLink, setHoveredLink] = useState<string | null>(null);
+
+  // Snapshot the tab id at mount: the keyed remount in App means it never
+  // changes during our lifetime, and reading from the store on unmount would
+  // give us the *next* active tab (the cleanup runs after activeTabId flips).
+  const [tabId] = useState(() => useStore.getState().activeTabId);
+  const restoredScrollRef = useRef(false);
 
   // Paint highlights using the CSS Custom Highlight API (no DOM mutation).
   const paintHighlights = useCallback(() => {
@@ -149,6 +163,22 @@ export default function DocumentView() {
     if (supportsHighlights) CSS.highlights.clear();
   }, []);
 
+  // Persist scroll position so switching tabs keeps the reader where they were.
+  // We write on every scroll (cheap Map write, no re-render) and also on
+  // unmount to capture the final position before React swaps the DOM.
+  useEffect(() => {
+    const scroller = scrollRef.current;
+    if (!scroller || !tabId) return;
+    const onScroll = () => {
+      scrollCache.set(tabId, scroller.scrollTop);
+    };
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      scrollCache.set(tabId, scroller.scrollTop);
+      scroller.removeEventListener("scroll", onScroll);
+    };
+  }, [tabId]);
+
   // Capture a selection inside the content into a pending comment.
   const onMouseUp = useCallback(() => {
     if (reading) return;
@@ -213,8 +243,18 @@ export default function DocumentView() {
     requestAnimationFrame(() => {
       paintHighlights();
       classify();
+      // Restore once, after the first content commit, so the browser has a real
+      // scrollHeight to clamp against. Subsequent renders (live reload, async
+      // shiki/mermaid mutations) leave the user's current position alone.
+      if (!restoredScrollRef.current) {
+        restoredScrollRef.current = true;
+        const saved = tabId ? scrollCache.get(tabId) : undefined;
+        if (saved != null && scrollRef.current) {
+          scrollRef.current.scrollTop = saved;
+        }
+      }
     });
-  }, [paintHighlights, classify]);
+  }, [paintHighlights, classify, tabId]);
 
   // Open a relative/absolute link target. Markdown files open as a new tab;
   // a same-document fragment scrolls in place; anything else is handed off to
