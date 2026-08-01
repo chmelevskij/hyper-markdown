@@ -1,7 +1,19 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
-import { useStore } from "../store/useStore";
+import { activeComments, activeTab, useStore } from "../store/useStore";
+import { hashSource } from "../lib/changes";
+import { LINE_KINDS, partAt, resolvePart } from "../lib/diagram";
 import { uid } from "../lib/id";
+import type { DiagramPart } from "../types";
 
 let initialized = false;
 async function ensureMermaid(mode: "light" | "dark") {
@@ -19,8 +31,362 @@ const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n
 const MIN_SCALE = 0.2;
 const MAX_SCALE = 8;
 
+/** Where a diagram part sits, in the stage's own (untransformed) coordinates. */
+interface Geom {
+  shape: "box" | "line";
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  pinX: number;
+  pinY: number;
+}
+
+interface Mark extends Geom {
+  id: string;
+  n: number;
+  color: string;
+  selected: boolean;
+}
+
+export interface PartPick {
+  part: DiagramPart;
+  rect: DOMRect;
+  srcStart?: number;
+  srcEnd?: number;
+}
+
+/**
+ * The diagram part a comment is currently being written against.
+ *
+ * Deliberately a context rather than a prop: the MDX `components` map is rebuilt
+ * whenever its inputs change, and a new `pre` function identity remounts every
+ * code block and diagram in the document — which would tear down the very
+ * diagram (and any open fullscreen viewer) the comment is being written on.
+ */
+export const PendingPartContext = createContext<DiagramPart | null>(null);
+
+const BOX_PAD = 4;
+
+/**
+ * Measure an element relative to the stage. Everything is divided by `scale`
+ * because the overlay lives *inside* the transformed content in the fullscreen
+ * viewer — that way markers pan and zoom with the diagram for free.
+ */
+function geomOf(el: Element, host: HTMLElement, scale: number, kind: string): Geom | null {
+  const r = el.getBoundingClientRect();
+  const h = host.getBoundingClientRect();
+  if (r.width === 0 && r.height === 0) return null;
+  const left = (r.left - h.left) / scale;
+  const top = (r.top - h.top) / scale;
+  const width = r.width / scale;
+  const height = r.height / scale;
+  if (LINE_KINDS.has(kind)) {
+    // A curved edge's bounding box says little; mark the stroke's midpoint.
+    const geo = el as SVGGeometryElement;
+    let pinX = left + width / 2;
+    let pinY = top + height / 2;
+    if (typeof geo.getTotalLength === "function") {
+      const ctm = geo.getScreenCTM();
+      if (ctm) {
+        try {
+          const p = geo.getPointAtLength(geo.getTotalLength() / 2);
+          pinX = (ctm.a * p.x + ctm.c * p.y + ctm.e - h.left) / scale;
+          pinY = (ctm.b * p.x + ctm.d * p.y + ctm.f - h.top) / scale;
+        } catch {
+          /* fall back to the bbox centre */
+        }
+      }
+    }
+    return { shape: "line", left, top, width, height, pinX, pinY };
+  }
+  return {
+    shape: "box",
+    left: left - BOX_PAD,
+    top: top - BOX_PAD,
+    width: width + BOX_PAD * 2,
+    height: height + BOX_PAD * 2,
+    pinX: left + width,
+    pinY: top,
+  };
+}
+
+/** Paint a stroked part by recolouring it — a tint over its bounding box would
+ *  cover half the diagram. Returns a reset function. */
+function paintStroke(el: Element, color: string, strong: boolean): () => void {
+  const style = (el as SVGElement).style;
+  const prev = { stroke: style.stroke, width: style.strokeWidth, opacity: style.strokeOpacity };
+  style.stroke = color;
+  style.strokeWidth = strong ? "4px" : "3px";
+  style.strokeOpacity = "1";
+  return () => {
+    style.stroke = prev.stroke;
+    style.strokeWidth = prev.width;
+    style.strokeOpacity = prev.opacity;
+  };
+}
+
+/**
+ * A rendered diagram plus its annotation layer: hover targeting, click-to-comment
+ * and a marker for every comment anchored into this block. Used both inline and
+ * inside the fullscreen viewer.
+ */
+function DiagramStage({
+  svg,
+  block,
+  srcStart,
+  srcEnd,
+  scale = 1,
+  interactive,
+  onPickPart,
+  suppressClick,
+}: {
+  svg: string;
+  block: string;
+  srcStart?: number;
+  srcEnd?: number;
+  scale?: number;
+  interactive: boolean;
+  onPickPart?: (pick: PartPick) => void;
+  suppressClick?: () => boolean;
+}) {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const pendingPart = useContext(PendingPartContext);
+  // Reading mode is a plain reader — same rule the text highlights follow.
+  const annotate = useStore((s) => s.viewMode === "comment");
+  const comments = useStore(activeComments);
+  const showResolved = useStore((s) => s.showResolved);
+  const selectedId = useStore((s) => activeTab(s)?.selectedId ?? null);
+  const selectComment = useStore((s) => s.selectComment);
+  const [marks, setMarks] = useState<Mark[]>([]);
+  const [hover, setHover] = useState<(Geom & { label: string }) | null>(null);
+  const strokeResets = useRef<Array<() => void>>([]);
+  // Stable identity: React 19 re-writes innerHTML whenever this prop's object
+  // changes, which would re-parse the SVG on every render and drop the inline
+  // highlights we paint onto it.
+  const html = useMemo(() => ({ __html: svg }), [svg]);
+
+  // Comments that live in this diagram, carrying their 1-based sidebar position
+  // so the pin numbers match the comment list.
+  const mine = useMemo(
+    () =>
+      annotate
+        ? comments
+            .map((c, i) => ({ c, n: i + 1 }))
+            .filter(
+              ({ c }) =>
+                c.anchor.part?.block === block && (showResolved || c.status === "open"),
+            )
+        : [],
+    [annotate, comments, block, showResolved],
+  );
+
+  const measure = useCallback(() => {
+    const host = hostRef.current;
+    const svgEl = host?.querySelector("svg") as SVGSVGElement | null;
+    strokeResets.current.forEach((reset) => reset());
+    strokeResets.current = [];
+    if (!host || !svgEl) {
+      setMarks([]);
+      return;
+    }
+    const next: Mark[] = [];
+    for (const { c, n } of mine) {
+      const part = c.anchor.part!;
+      const el = resolvePart(svgEl, part);
+      if (!el) continue;
+      const geom = geomOf(el, host, scale, part.kind);
+      if (!geom) continue;
+      const selected = c.id === selectedId;
+      if (geom.shape === "line") {
+        strokeResets.current.push(paintStroke(el, c.color, selected));
+      }
+      next.push({ ...geom, id: c.id, n, color: c.color, selected });
+    }
+    setMarks(next);
+  }, [mine, scale, selectedId]);
+
+  useLayoutEffect(() => {
+    measure();
+  }, [measure, svg]);
+
+  useEffect(() => () => strokeResets.current.forEach((reset) => reset()), []);
+
+  // Re-measure when the diagram reflows (window resize, sidebar drag, fonts) or
+  // when its SVG is swapped out from under us (a re-render of the same diagram).
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    let raf = 0;
+    const schedule = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => measure());
+    };
+    const ro = new ResizeObserver(schedule);
+    ro.observe(host);
+    const mo = new MutationObserver(schedule);
+    mo.observe(host, { childList: true, subtree: true });
+    return () => {
+      ro.disconnect();
+      mo.disconnect();
+      cancelAnimationFrame(raf);
+    };
+  }, [measure]);
+
+  const hitAt = useCallback(
+    (e: React.MouseEvent) => {
+      const host = hostRef.current;
+      const svgEl = host?.querySelector("svg") as SVGSVGElement | null;
+      if (!host || !svgEl) return null;
+      const hit = partAt(e.target as Element, svgEl, block, { x: e.clientX, y: e.clientY });
+      if (!hit) return null;
+      return { ...hit, host };
+    },
+    [block],
+  );
+
+  const onMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (!interactive) return;
+      const hit = hitAt(e);
+      if (!hit) {
+        setHover(null);
+        return;
+      }
+      const geom = geomOf(hit.el, hit.host, scale, hit.part.kind);
+      setHover(geom ? { ...geom, label: hit.part.label } : null);
+    },
+    [hitAt, interactive, scale],
+  );
+
+  const onClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (!interactive || !onPickPart) return;
+      if (suppressClick?.()) return;
+      const hit = hitAt(e);
+      if (!hit) return;
+      // Stop the click here: it must not reach the document's comment hit-test
+      // or the fullscreen viewer's close-on-backdrop handler.
+      e.stopPropagation();
+      const rect = LINE_KINDS.has(hit.part.kind)
+        ? new DOMRect(e.clientX, e.clientY, 0, 0)
+        : hit.el.getBoundingClientRect();
+      onPickPart({ part: hit.part, rect, srcStart, srcEnd });
+    },
+    [hitAt, interactive, onPickPart, srcEnd, srcStart, suppressClick],
+  );
+
+  // Keep the part outlined while its comment is being written; a live hover wins.
+  const pendingGeom = usePendingGeom(hostRef, svg, pendingPart, block, scale);
+  const outline = hover ?? pendingGeom;
+
+  return (
+    <div
+      ref={hostRef}
+      className={`diagram-stage ${interactive ? "is-interactive" : ""} ${
+        hover ? "is-targeting" : ""
+      }`}
+      onMouseMove={onMouseMove}
+      onMouseLeave={() => setHover(null)}
+      onClick={onClick}
+    >
+      <div className="diagram-stage__svg" dangerouslySetInnerHTML={html} />
+      {outline && outline.shape === "box" && (
+        <div
+          className="part-outline"
+          style={{
+            left: outline.left,
+            top: outline.top,
+            width: outline.width,
+            height: outline.height,
+          }}
+        />
+      )}
+      {outline && outline.shape === "line" && (
+        <div
+          className="part-outline part-outline--dot"
+          style={{ left: outline.pinX, top: outline.pinY, transform: `translate(-50%, -50%) scale(${1 / scale})` }}
+        />
+      )}
+      {marks.map((m) => (
+        <div key={m.id} className="part-mark">
+          {m.shape === "box" && (
+            <div
+              className={`part-mark__box ${m.selected ? "is-selected" : ""}`}
+              style={{
+                left: m.left,
+                top: m.top,
+                width: m.width,
+                height: m.height,
+                background: m.color,
+                borderColor: m.color,
+              }}
+            />
+          )}
+          <button
+            type="button"
+            className={`part-mark__pin ${m.selected ? "is-selected" : ""}`}
+            style={{
+              left: m.pinX,
+              top: m.pinY,
+              background: m.color,
+              transform: `translate(-50%, -50%) scale(${1 / scale})`,
+            }}
+            title="Show this comment"
+            onClick={(e) => {
+              e.stopPropagation();
+              selectComment(m.id);
+            }}
+          >
+            {m.n}
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Geometry of the part a not-yet-saved comment is being written against. */
+function usePendingGeom(
+  hostRef: React.RefObject<HTMLDivElement | null>,
+  svg: string,
+  part: DiagramPart | null | undefined,
+  block: string,
+  scale: number,
+): (Geom & { label: string }) | null {
+  const [geom, setGeom] = useState<(Geom & { label: string }) | null>(null);
+  useLayoutEffect(() => {
+    const host = hostRef.current;
+    const svgEl = host?.querySelector("svg") as SVGSVGElement | null;
+    if (!host || !svgEl || !part || part.block !== block) {
+      setGeom(null);
+      return;
+    }
+    const el = resolvePart(svgEl, part);
+    const g = el ? geomOf(el, host, scale, part.kind) : null;
+    setGeom(g ? { ...g, label: part.label } : null);
+  }, [hostRef, svg, part, block, scale]);
+  return geom;
+}
+
 /** Fullscreen pan/zoom viewer for a rendered diagram. */
-function MermaidViewer({ svg, onClose }: { svg: string; onClose: () => void }) {
+function MermaidViewer({
+  svg,
+  block,
+  srcStart,
+  srcEnd,
+  interactive,
+  onPickPart,
+  onClose,
+}: {
+  svg: string;
+  block: string;
+  srcStart?: number;
+  srcEnd?: number;
+  interactive: boolean;
+  onPickPart?: (pick: PartPick) => void;
+  onClose: () => void;
+}) {
   const stageRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
@@ -116,6 +482,9 @@ function MermaidViewer({ svg, onClose }: { svg: string; onClose: () => void }) {
   return createPortal(
     <div className="mermaid-viewer" onClick={onClose} data-no-select>
       <div className="mermaid-viewer__bar" onClick={(e) => e.stopPropagation()}>
+        {interactive && (
+          <span className="mermaid-viewer__hint">Click a part of the diagram to comment</span>
+        )}
         <button className="btn btn--ghost" onClick={() => zoomBy(1.2)} title="Zoom in">+</button>
         <button className="btn btn--ghost" onClick={() => zoomBy(1 / 1.2)} title="Zoom out">−</button>
         <button className="btn btn--ghost" onClick={reset} title="Reset">Reset</button>
@@ -134,21 +503,46 @@ function MermaidViewer({ svg, onClose }: { svg: string; onClose: () => void }) {
           ref={contentRef}
           className="mermaid-viewer__content"
           style={{ transform: `translate(${tx}px, ${ty}px) scale(${scale})` }}
-          dangerouslySetInnerHTML={{ __html: svg }}
-        />
+        >
+          <DiagramStage
+            svg={svg}
+            block={block}
+            srcStart={srcStart}
+            srcEnd={srcEnd}
+            scale={scale}
+            interactive={interactive}
+            onPickPart={onPickPart}
+            suppressClick={() => draggedRef.current}
+          />
+        </div>
       </div>
     </div>,
     document.body,
   );
 }
 
+interface Props {
+  code: string;
+  /** Source line range of the fenced block, stamped by rehypeSourceLine. */
+  srcStart?: number;
+  srcEnd?: number;
+  onPickPart?: (pick: PartPick) => void;
+}
+
 /** Renders a ```mermaid fenced block to inline SVG, theme-aware, with error fallback. */
-export default function Mermaid({ code }: { code: string }) {
+export default function Mermaid({ code, srcStart, srcEnd, onPickPart }: Props) {
   const mode = useStore((s) => s.mode);
+  const commenting = useStore((s) => s.viewMode === "comment");
   const [svg, setSvg] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const idRef = useRef(`mmd-${uid().slice(0, 8)}`);
+  // Identity of this fenced block within the document — its start line where the
+  // renderer stamped one, else a hash of the diagram source.
+  const block = useMemo(
+    () => (srcStart != null ? `L${srcStart}` : `H${hashSource(code)}`),
+    [srcStart, code],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -178,8 +572,15 @@ export default function Mermaid({ code }: { code: string }) {
     );
   }
   if (!svg) return <div className="mermaid-loading" data-no-select>Rendering diagram…</div>;
+  const interactive = commenting && !!onPickPart;
   return (
-    <div className="mermaid-figure" data-no-select>
+    <div
+      className="mermaid-figure"
+      data-no-select
+      data-src-start={srcStart}
+      data-src-end={srcEnd}
+      data-mermaid-block={block}
+    >
       <button
         type="button"
         className="mermaid-expand"
@@ -188,8 +589,27 @@ export default function Mermaid({ code }: { code: string }) {
       >
         ⤢
       </button>
-      <div className="mermaid-figure__svg" dangerouslySetInnerHTML={{ __html: svg }} />
-      {expanded && <MermaidViewer svg={svg} onClose={() => setExpanded(false)} />}
+      <div className="mermaid-figure__svg">
+        <DiagramStage
+          svg={svg}
+          block={block}
+          srcStart={srcStart}
+          srcEnd={srcEnd}
+          interactive={interactive}
+          onPickPart={onPickPart}
+        />
+      </div>
+      {expanded && (
+        <MermaidViewer
+          svg={svg}
+          block={block}
+          srcStart={srcStart}
+          srcEnd={srcEnd}
+          interactive={interactive}
+          onPickPart={onPickPart}
+          onClose={() => setExpanded(false)}
+        />
+      )}
     </div>
   );
 }

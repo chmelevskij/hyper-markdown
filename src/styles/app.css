@@ -213,6 +213,40 @@ body {
 
 .sidebar__collapse { margin-left: auto; align-self: center; }
 
+/* Text-column width handles — hairlines on the column edges, hover-revealed
+   like the sidebar splitter. Fixed so they hold still while the doc scrolls. */
+.col-resizer {
+  position: fixed;
+  width: 11px;
+  transform: translateX(-50%);
+  cursor: col-resize;
+  z-index: 6;
+  background: transparent;
+}
+.col-resizer::before {
+  content: "";
+  position: absolute;
+  inset: 10% 5px;
+  background: var(--quote-border);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.col-resizer:hover::before,
+.col-resizer.is-dragging::before { opacity: 1; }
+.col-resizer.is-dragging::before { background: var(--accent); }
+.col-resizer__readout {
+  position: fixed;
+  transform: translateX(-50%);
+  z-index: 7;
+  padding: 4px 10px;
+  background: var(--ink);
+  color: var(--ink-fg);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  border-radius: var(--radius-sm);
+  pointer-events: none;
+}
+
 /* ---- Buttons — flat, hairline, charcoal primary ---- */
 .btn {
   font: inherit;
@@ -312,7 +346,9 @@ body {
 /* ---- Selection popover ---- */
 .sel-popover {
   position: fixed;
-  z-index: 50;
+  /* Above the fullscreen diagram viewer (z-index 100) — parts can be commented
+     on from inside it. */
+  z-index: 120;
   width: 320px;
   background: var(--surface);
   border: var(--border-w) solid var(--border);
@@ -320,13 +356,35 @@ body {
   box-shadow: 0 12px 32px var(--shadow);
   padding: 14px;
 }
+.sel-popover__quote-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 8px;
+}
 .sel-popover__quote {
+  flex: 1 1 auto;
   font-size: 12px;
   color: var(--muted);
   font-style: italic;
-  margin-bottom: 8px;
   max-height: 48px;
   overflow: hidden;
+}
+.sel-popover__copy {
+  flex: 0 0 auto;
+  font-size: 12px;
+  line-height: 1.3;
+}
+.sel-popover__kind {
+  font-style: normal;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-right: 6px;
+  padding: 1.5px 5px;
+  border: var(--border-w) solid var(--border);
+  border-radius: var(--radius-sm);
 }
 .sel-popover__input,
 .comment-card__editor {
@@ -433,6 +491,31 @@ body {
   border-radius: 999px;
   border: 1px solid rgba(0, 0, 0, 0.12);
   flex: 0 0 auto;
+}
+/* Numbered pin — mirrors the badge drawn on the diagram part. */
+.comment-card__pin {
+  flex: 0 0 auto;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  line-height: 1;
+  color: #fff;
+}
+.comment-card__part {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 1.5px 5px;
+  border: var(--border-w) solid var(--border);
+  border-radius: var(--radius-sm);
 }
 .comment-card__lines {
   font-family: var(--font-mono);

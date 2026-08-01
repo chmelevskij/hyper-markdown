@@ -173,6 +173,65 @@
 }
 .mermaid-figure svg { max-width: 100%; height: auto; }
 
+/* ---- Diagram annotation layer ----
+   The stage hosts the SVG plus absolutely-positioned markers. In the fullscreen
+   viewer it sits inside the transformed content, so markers pan and zoom with
+   the diagram; pins counter-scale so they stay legible. */
+.diagram-stage { position: relative; }
+.diagram-stage.is-targeting { cursor: pointer; }
+
+.part-outline {
+  position: absolute;
+  pointer-events: none;
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--hl-pending);
+}
+.part-outline--dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border-style: solid;
+  background: var(--hl-active);
+}
+
+.part-mark__box {
+  position: absolute;
+  pointer-events: none;
+  border: 1px solid;
+  border-radius: var(--radius-sm);
+  opacity: 0.28;
+}
+.part-mark__box.is-selected { opacity: 0.42; }
+.part-mark__pin {
+  position: absolute;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--bg);
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 1px 4px var(--shadow);
+}
+.part-mark__pin.is-selected {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.mermaid-viewer__hint {
+  margin-right: auto;
+  align-self: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 /* Expand affordance — visible on hover/focus, top-right of the figure. */
 .mermaid-expand {
   position: absolute;

@@ -4,7 +4,7 @@ import { compileDocument, type MDXContent } from "../lib/render";
 import { categorizeLink, resolveLinkPath, type ResolvedTarget } from "../lib/links";
 import { platform } from "../platform";
 import CodeBlock from "./CodeBlock";
-import Mermaid from "./Mermaid";
+import Mermaid, { type PartPick } from "./Mermaid";
 
 function nodeToText(node: ReactNode): string {
   if (node == null || typeof node === "boolean") return "";
@@ -12,6 +12,11 @@ function nodeToText(node: ReactNode): string {
   if (Array.isArray(node)) return node.map(nodeToText).join("");
   if (isValidElement(node)) return nodeToText((node.props as { children?: ReactNode }).children);
   return "";
+}
+
+function numberOrUndefined(value: unknown): number | undefined {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
 }
 
 /** Shared no-op so the components memo stays stable when no hover handler is wired up. */
@@ -27,6 +32,7 @@ function buildComponents(
   docPath: string | undefined,
   onOpenTarget: ((target: ResolvedTarget) => void) | undefined,
   onHoverTarget: (label: string | null) => void,
+  onPickPart: ((pick: PartPick) => void) | undefined,
 ): MDXComponents {
   return {
     pre(props: Record<string, unknown>) {
@@ -36,9 +42,19 @@ function buildComponents(
         const className = codeProps.className ?? "";
         const lang = /language-([\w-]+)/.exec(className)?.[1];
         const code = nodeToText(codeProps.children).replace(/\n$/, "");
-        const dataSrcStart = props["data-src-start"] as number | undefined;
-        const dataSrcEnd = props["data-src-end"] as number | undefined;
-        if (lang === "mermaid") return <Mermaid code={code} />;
+        // hast hands these back as attribute strings; comments do arithmetic on them.
+        const dataSrcStart = numberOrUndefined(props["data-src-start"]);
+        const dataSrcEnd = numberOrUndefined(props["data-src-end"]);
+        if (lang === "mermaid") {
+          return (
+            <Mermaid
+              code={code}
+              srcStart={dataSrcStart}
+              srcEnd={dataSrcEnd}
+              onPickPart={onPickPart}
+            />
+          );
+        }
         return <CodeBlock code={code} lang={lang} dataSrcStart={dataSrcStart} dataSrcEnd={dataSrcEnd} />;
       }
       return <pre {...(props as object)} />;
@@ -100,6 +116,8 @@ interface Props {
   onOpenTarget?: (target: ResolvedTarget) => void;
   /** Called as the user hovers over links: receives the preview label, or null when leaving. */
   onHoverTarget?: (label: string | null) => void;
+  /** Called when a part of a rendered diagram is clicked in comment mode. */
+  onPickPart?: (pick: PartPick) => void;
   onRendered?: () => void;
 }
 
@@ -110,15 +128,19 @@ export default function MdxRenderer({
   docPath,
   onOpenTarget,
   onHoverTarget,
+  onPickPart,
   onRendered,
 }: Props) {
   const [Content, setContent] = useState<MDXContent | null>(null);
   const [error, setError] = useState<string | null>(null);
   const key = useMemo(() => `${nonce}:${format}`, [nonce, format]);
 
+  // Keep these inputs stable: a new `components` object means new `pre` / `a`
+  // function identities, which React treats as different element types and
+  // remounts every code block and diagram in the document.
   const components = useMemo(
-    () => buildComponents(docPath, onOpenTarget, onHoverTarget ?? NOOP_HOVER),
-    [docPath, onOpenTarget, onHoverTarget],
+    () => buildComponents(docPath, onOpenTarget, onHoverTarget ?? NOOP_HOVER, onPickPart),
+    [docPath, onOpenTarget, onHoverTarget, onPickPart],
   );
 
   useEffect(() => {

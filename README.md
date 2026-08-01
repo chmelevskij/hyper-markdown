@@ -12,9 +12,17 @@ agent can act on your review precisely.
 - **Render Markdown & MDX** — runtime-compiled MDX (JSX + expressions), GFM (tables, task
   lists, strikethrough), frontmatter, and math (`$…$`).
 - **Mermaid diagrams** — fenced ` ```mermaid ` blocks render to inline SVG, theme-aware.
+- **Comment on diagram parts** — click a node, edge, subgraph, participant or message
+  (inline or in the fullscreen viewer) to attach a comment to *that* part. Commented parts
+  carry a tint and a numbered pin matching the sidebar; the export names the part and
+  quotes the whole fenced block. Anchors ride on Mermaid's own ids, so they survive
+  re-renders, theme flips and edits elsewhere in the diagram.
 - **Syntax highlighting** — Shiki, with light/dark themes that follow the app.
 - **Highlight → comment → export** — select any passage, attach a note; export all comments
-  as agent-ready Markdown (or JSON) to the clipboard or a `.comments.md` file.
+  as agent-ready Markdown (or JSON) to the clipboard or a `.comments.md` file. The passage
+  stays highlighted while you write, and ⌘C (or the copy icon) copies it.
+- **Adjustable text column** — drag either edge of the column to set its width;
+  double-click to reset. The width is remembered.
 - **Import comments** — read an exported `.md`/`.json` (or a sidecar file) back in;
   comments re-anchor to the current document by their quoted text.
 - **Tabs** — open multiple documents at once; each tab keeps its own comments, review
@@ -43,6 +51,14 @@ _2 comments • exported 2026-05-25_
 > the exact quoted source passage
 
 **Comment:** Tighten this; it contradicts §2.
+
+## 2 · lines 30–38 · diagram node “Start”
+> ```mermaid
+> flowchart TD
+>   A[Start] --> B{Decision}
+> …
+
+**Comment:** Rename this to “Ingest”.
 ```
 
 Paste it into Claude Code (or any agent) and it has precise, line-anchored instructions.

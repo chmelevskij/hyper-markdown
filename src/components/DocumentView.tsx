@@ -2,10 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore, HIGHLIGHT_COLORS, activeTab, activeComments } from "../store/useStore";
 import { captureAnchor, createResolver, resolveRange, sourceLinesForRange } from "../lib/anchor";
 import { hashSource, normalizeForCompare, sliceSourceLines } from "../lib/changes";
+import { resolvePart } from "../lib/diagram";
 import { isMarkdownPath, type ResolvedTarget } from "../lib/links";
 import { platform } from "../platform";
-import type { Anchor, CommentChange } from "../types";
+import type { Anchor, Baseline, Comment, CommentChange, DiagramPart } from "../types";
+import ColumnResizer from "./ColumnResizer";
 import MdxRenderer from "./MdxRenderer";
+import { PendingPartContext, type PartPick } from "./Mermaid";
 import SelectionPopover from "./SelectionPopover";
 
 interface PendingSelection {
@@ -23,12 +26,54 @@ const supportsHighlights = typeof CSS !== "undefined" && "highlights" in CSS;
  */
 const scrollCache = new Map<string, number>();
 
+const escapeAttr = (s: string) =>
+  typeof CSS !== "undefined" && CSS.escape ? CSS.escape(s) : s.replace(/["\\]/g, "\\$&");
+
+/** The rendered figure for a diagram block, if it is still in the document. */
+function figureFor(root: HTMLElement, block: string): HTMLElement | null {
+  return root.querySelector(`[data-mermaid-block="${escapeAttr(block)}"]`);
+}
+
+/** Live element a diagram comment points at, or null once it is gone. */
+function partElement(root: HTMLElement, part: DiagramPart): Element | null {
+  const svg = figureFor(root, part.block)?.querySelector("svg") as SVGSVGElement | null;
+  return svg ? resolvePart(svg, part) : null;
+}
+
+/**
+ * Change state for a comment on a diagram part. The baseline holds the whole
+ * fenced block, so an untouched fence means an untouched comment wherever it
+ * moved to; otherwise the part either still renders (edited) or does not
+ * (removed).
+ */
+function classifyPart(
+  root: HTMLElement,
+  comment: Comment,
+  baseline: Baseline,
+  source: string,
+): CommentChange {
+  const part = comment.anchor.part!;
+  const wasText = baseline.sourceText ?? "";
+  if (wasText && source.includes(wasText)) return { state: "untouched" };
+  const figure = figureFor(root, part.block);
+  if (!figure || !partElement(root, part)) return { state: "removed", wasText };
+  const start = Number(figure.dataset.srcStart);
+  const end = Number(figure.dataset.srcEnd);
+  const nowText = Number.isFinite(start)
+    ? sliceSourceLines(source, start, Number.isFinite(end) ? end : start)
+    : "";
+  return normalizeForCompare(nowText) === normalizeForCompare(wasText)
+    ? { state: "untouched" }
+    : { state: "edited", wasText, nowText };
+}
+
 export default function DocumentView() {
   const doc = useStore((s) => activeTab(s)?.doc ?? null);
   const comments = useStore(activeComments);
   const selectedId = useStore((s) => activeTab(s)?.selectedId ?? null);
   const safeMode = useStore((s) => s.safeMode);
   const viewMode = useStore((s) => s.viewMode);
+  const contentWidth = useStore((s) => s.contentWidth);
   const renderNonce = useStore((s) => activeTab(s)?.renderNonce ?? 0);
   const addComment = useStore((s) => s.addComment);
   const selectComment = useStore((s) => s.selectComment);
@@ -61,6 +106,9 @@ export default function DocumentView() {
     const active = new Highlight();
     for (const c of comments) {
       if (c.status === "resolved" && !useStore.getState().showResolved) continue;
+      // Diagram comments are painted by the diagram's own overlay — the Custom
+      // Highlight API only paints text ranges.
+      if (c.anchor.part) continue;
       const range = resolve(c.anchor);
       if (!range) continue;
       if (c.id === selectedId) {
@@ -72,7 +120,15 @@ export default function DocumentView() {
     }
     buckets.forEach((h, i) => CSS.highlights.set(`hmd-${i}`, h));
     CSS.highlights.set("hmd-active", active);
-  }, [comments, selectedId, reading]);
+    // Keep the in-flight selection visible: focusing the popover's textarea
+    // drops the native selection paint, so we own the highlight ourselves.
+    const draft = new Highlight();
+    if (pending && !pending.anchor.part) {
+      const range = resolve(pending.anchor);
+      if (range) draft.add(range);
+    }
+    CSS.highlights.set("hmd-pending", draft);
+  }, [comments, selectedId, reading, pending]);
 
   // Classify each comment against its baseline: untouched / edited / removed.
   const classify = useCallback(() => {
@@ -87,6 +143,10 @@ export default function DocumentView() {
       if (!b) continue; // no baseline (e.g. imported) → no badge
       if (b.docHash === curHash) {
         map[c.id] = { state: "untouched" };
+        continue;
+      }
+      if (c.anchor.part) {
+        map[c.id] = classifyPart(root, c, b, source);
         continue;
       }
       const range = resolve(c.anchor);
@@ -148,9 +208,10 @@ export default function DocumentView() {
     if (!root || !scroller) return;
     const comment = comments.find((c) => c.id === selectedId);
     if (!comment) return;
-    const range = resolveRange(root, comment.anchor);
-    if (!range) return;
-    const rect = range.getBoundingClientRect();
+    const rect = comment.anchor.part
+      ? (partElement(root, comment.anchor.part)?.getBoundingClientRect() ?? null)
+      : (resolveRange(root, comment.anchor)?.getBoundingClientRect() ?? null);
+    if (!rect) return;
     if (rect.width === 0 && rect.height === 0) return;
     const view = scroller.getBoundingClientRect();
     if (rect.top >= view.top && rect.bottom <= view.bottom) return;
@@ -207,11 +268,14 @@ export default function DocumentView() {
       if (reading || pending) return;
       const root = rootRef.current;
       if (!root) return;
+      // Diagrams run their own hit-testing (see Mermaid's DiagramStage).
+      if ((e.target as Element | null)?.closest("[data-no-select]")) return;
       const caret =
         document.caretRangeFromPoint?.(e.clientX, e.clientY) ?? null;
       if (!caret) return;
       const resolve = createResolver(root);
       for (const c of comments) {
+        if (c.anchor.part) continue;
         const range = resolve(c.anchor);
         if (range && range.comparePoint(caret.startContainer, caret.startOffset) === 0) {
           selectComment(c.id);
@@ -221,6 +285,23 @@ export default function DocumentView() {
     },
     [comments, pending, reading, selectComment],
   );
+
+  // A click on a node / edge / participant inside a rendered diagram. The part
+  // itself is the anchor; the fenced block's line range rides along so the
+  // exported comment still points the agent at the right source.
+  const handlePickPart = useCallback((pick: PartPick) => {
+    const anchor: Anchor = {
+      quote: pick.part.label,
+      prefix: "",
+      suffix: "",
+      start: 0,
+      end: 0,
+      sourceLineStart: pick.srcStart,
+      sourceLineEnd: pick.srcEnd,
+      part: pick.part,
+    };
+    setPending({ rect: pick.rect, anchor });
+  }, []);
 
   const commitComment = (body: string) => {
     if (pending) {
@@ -294,24 +375,30 @@ export default function DocumentView() {
       <article
         ref={rootRef}
         className="markdown-body"
+        style={{ maxWidth: contentWidth }}
         onMouseUp={onMouseUp}
         onClick={onContentClick}
       >
-        <MdxRenderer
-          source={doc.source}
-          format={safeMode ? "md" : doc.format}
-          nonce={renderNonce}
-          docPath={doc.path}
-          onOpenTarget={handleOpenTarget}
-          onHoverTarget={setHoveredLink}
-          onRendered={handleRendered}
-        />
+        <PendingPartContext.Provider value={pending?.anchor.part ?? null}>
+          <MdxRenderer
+            source={doc.source}
+            format={safeMode ? "md" : doc.format}
+            nonce={renderNonce}
+            docPath={doc.path}
+            onOpenTarget={handleOpenTarget}
+            onHoverTarget={setHoveredLink}
+            onPickPart={handlePickPart}
+            onRendered={handleRendered}
+          />
+        </PendingPartContext.Provider>
       </article>
+      <ColumnResizer scrollRef={scrollRef} />
       {hoveredLink && <div className="link-preview">{hoveredLink}</div>}
       {pending && (
         <SelectionPopover
           rect={pending.rect}
           quote={pending.anchor.quote}
+          kind={pending.anchor.part?.kind}
           onSubmit={commitComment}
           onCancel={() => {
             setPending(null);

@@ -19,6 +19,7 @@
   --hl-3: rgba(168, 110, 122, 0.26); /* dusk rose */
   --hl-4: rgba(126, 118, 158, 0.26); /* heather */
   --hl-active: rgba(64, 112, 229, 0.30); /* cobalt — the accent */
+  --hl-pending: rgba(64, 112, 229, 0.20); /* the draft selection, one step back */
 }
 
 /* ---- Light: warm paper ---- */
@@ -72,5 +73,15 @@
   text-decoration: underline;
   text-decoration-color: var(--accent);
   text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+/* The passage a not-yet-saved comment is being written against. Keeps the
+   selection legible once focus moves into the popover's note field. */
+::highlight(hmd-pending) {
+  background-color: var(--hl-pending);
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 1px;
+  text-decoration-style: dashed;
   text-underline-offset: 3px;
 }
