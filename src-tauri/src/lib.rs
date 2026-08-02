@@ -187,21 +187,24 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|app, event| {
-            // macOS delivers files to open (CLI `hmd` / Finder) as an Opened event.
-            if let tauri::RunEvent::Opened { urls } = event {
+        .run(|_app, _event| {
+            // macOS delivers files to open (CLI `hmd` / Finder) as an Opened
+            // event. `RunEvent::Opened` only exists on macOS/iOS, so this must
+            // stay behind a cfg or the Linux and Windows builds fail to compile.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Opened { urls } = _event {
                 let paths: Vec<String> = urls
                     .iter()
                     .filter_map(|u| u.to_file_path().ok())
                     .map(|p| p.to_string_lossy().to_string())
                     .collect();
                 if !paths.is_empty() {
-                    if let Some(state) = app.try_state::<PendingFiles>() {
+                    if let Some(state) = _app.try_state::<PendingFiles>() {
                         let mut pend = state.0.lock().unwrap();
                         pend.extend(paths.iter().cloned());
                     }
                     for p in &paths {
-                        let _ = app.emit("open-file", p.clone());
+                        let _ = _app.emit("open-file", p.clone());
                     }
                 }
             }
