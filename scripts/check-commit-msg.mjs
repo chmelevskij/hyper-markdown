@@ -27,7 +27,7 @@ export const TYPES = {
   fix: "a user-visible bug fix",
   perf: "faster or lighter, same behaviour",
   refactor: "restructuring with no behaviour change",
-  docs: "README, PLAN, skill docs, code comments",
+  docs: "README, CHANGELOG, skill docs, code comments",
   style: "formatting only, no code change",
   test: "tests only",
   build: "build system, bundling, dependencies",

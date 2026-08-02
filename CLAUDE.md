@@ -62,7 +62,7 @@ BREAKING CHANGE: what consumers must do differently
 | `fix` | a user-visible bug fix | **Bug Fixes** (bumps patch) |
 | `perf` | faster/lighter, same behaviour | Performance |
 | `refactor` | restructuring, no behaviour change | Refactors |
-| `docs` | README, PLAN, skill docs, comments | Documentation |
+| `docs` | README, CHANGELOG, skill docs, comments | Documentation |
 | `build` | bundling, dependencies, Tauri config | Build & Tooling |
 | `ci` | GitHub Actions, release plumbing | Build & Tooling |
 | `style` | formatting only | hidden |
@@ -142,7 +142,7 @@ There is no test suite. `pnpm build` (which typechecks) is the gate.
 
 ## Architecture
 
-See [PLAN.md](./PLAN.md). Load-bearing pieces:
+See the Architecture section of [README.md](./README.md). Load-bearing pieces:
 
 - `src/lib/render.ts` — MDX `evaluate()` + remark/rehype, including
   `rehype-source-line` which stamps source line numbers onto rendered elements.
