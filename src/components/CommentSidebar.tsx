@@ -11,7 +11,16 @@ const CHANGE_LABEL: Record<CommentChange["state"], string> = {
   removed: "removed",
 };
 
-function CommentCard({ comment, change }: { comment: Comment; change?: CommentChange }) {
+function CommentCard({
+  comment,
+  change,
+  n,
+}: {
+  comment: Comment;
+  change?: CommentChange;
+  /** Position in the document's comment list — matches the pin drawn on a diagram. */
+  n: number;
+}) {
   const selectedId = useStore((s) => activeTab(s)?.selectedId ?? null);
   const selectComment = useStore((s) => s.selectComment);
   const updateComment = useStore((s) => s.updateComment);
@@ -40,8 +49,17 @@ function CommentCard({ comment, change }: { comment: Comment; change?: CommentCh
       onClick={() => selectComment(comment.id)}
     >
       <div className="comment-card__head">
-        <span className="comment-card__swatch" style={{ background: comment.color }} />
+        {comment.anchor.part ? (
+          <span className="comment-card__pin" style={{ background: comment.color }}>
+            {n}
+          </span>
+        ) : (
+          <span className="comment-card__swatch" style={{ background: comment.color }} />
+        )}
         {lineLabel && <span className="comment-card__lines">{lineLabel}</span>}
+        {comment.anchor.part && (
+          <span className="comment-card__part">{comment.anchor.part.kind}</span>
+        )}
         {state && (
           <span className={`change-badge change-badge--${state}`}>{CHANGE_LABEL[state]}</span>
         )}
@@ -251,7 +269,14 @@ export default function CommentSidebar({ width }: { width: number }) {
               : "Select text in the document to attach a comment. Each comment carries the quoted source and its line numbers for the agent."}
           </p>
         ) : (
-          visible.map((c) => <CommentCard key={c.id} comment={c} change={changes[c.id]} />)
+          visible.map((c) => (
+            <CommentCard
+              key={c.id}
+              comment={c}
+              change={changes[c.id]}
+              n={comments.indexOf(c) + 1}
+            />
+          ))
         )}
       </div>
 

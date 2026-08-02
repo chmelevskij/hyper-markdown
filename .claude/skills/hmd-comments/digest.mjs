@@ -61,6 +61,16 @@ function lineLabel(anchor) {
   return e && e !== s ? `L${s}–${e}` : `L${s}`;
 }
 
+/**
+ * Comments on a Mermaid part span the whole fenced block, so the line range
+ * alone can't say what they are about — name the part instead. Identity only;
+ * still no quoted source.
+ */
+function partLabel(anchor) {
+  const part = anchor?.part;
+  return part ? `${part.kind} “${anchor.quote}” · ` : "";
+}
+
 function oneLine(s) {
   return (s || "").replace(/\s+/g, " ").trim() || "(no note)";
 }
@@ -95,7 +105,7 @@ function cmdList(dir, includeResolved) {
       rows.push(
         `  [${String(c.id).slice(0, 8)}] ${lineLabel(c.anchor).padEnd(8)} ${
           c.status === "resolved" ? "(resolved) " : ""
-        }${oneLine(c.body)}`,
+        }${partLabel(c.anchor)}${oneLine(c.body)}`,
       );
     }
     if (rows.length) groups.push(`${rel.split(sep).join("/")}\n${rows.join("\n")}`);

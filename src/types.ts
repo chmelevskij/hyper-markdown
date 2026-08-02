@@ -1,3 +1,22 @@
+/**
+ * A part of a rendered Mermaid diagram (a node, an edge, a subgraph, a
+ * participant…). Mermaid v11 stamps its own semantic ids onto the SVG, so a
+ * part can be re-found after a re-render even though the surrounding element
+ * ids carry a fresh per-render prefix each time.
+ */
+export interface DiagramPart {
+  /** Which ```mermaid block in the document (its fence start line, else a code hash). */
+  block: string;
+  /** node | edge | subgraph | participant | message | lifeline | label | … */
+  kind: string;
+  /** Identity within the diagram, from mermaid's own ids ("flowchart-A-0", "L_A_B_0", "Bob"). */
+  key: string;
+  /** Structural fallback: child-index path from the <svg> root. */
+  path: string;
+  /** Visible label at capture time; doubles as a last-resort matcher. */
+  label: string;
+}
+
 /** A persisted text anchor for a highlight, modeled on the W3C annotation selectors. */
 export interface Anchor {
   /** Exact selected text. */
@@ -12,6 +31,12 @@ export interface Anchor {
   /** Source line range in the original Markdown, when resolvable. */
   sourceLineStart?: number;
   sourceLineEnd?: number;
+  /**
+   * Set when the comment targets a piece of a rendered diagram instead of a
+   * text range. The text fields still carry the part's label and the fenced
+   * block's line range, so the sidebar, export and sidecar format are unchanged.
+   */
+  part?: DiagramPart;
 }
 
 export type CommentStatus = "open" | "resolved";

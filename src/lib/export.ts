@@ -7,6 +7,22 @@ function lineLabel(c: Comment): string {
   return ` · lines ${s}–${e}`;
 }
 
+/** " · diagram node “Start”" for comments anchored into a rendered diagram. */
+function partLabel(c: Comment): string {
+  const part = c.anchor.part;
+  return part ? ` · diagram ${part.kind} “${c.anchor.quote}”` : "";
+}
+
+/**
+ * What to quote back at the agent. Diagram comments quote the whole fenced
+ * block (captured in the baseline) so the source it needs to edit is right
+ * there; the part itself is named in the heading.
+ */
+function quotedSource(c: Comment): string {
+  if (!c.anchor.part) return c.anchor.quote;
+  return c.baseline?.sourceText || c.anchor.quote;
+}
+
 function blockQuote(text: string): string {
   return text
     .split("\n")
@@ -39,9 +55,9 @@ export function toMarkdown(
     .map((c, i) => {
       const status = c.status === "resolved" ? " _(resolved)_" : "";
       return [
-        `## ${i + 1}${lineLabel(c)}${status}`,
+        `## ${i + 1}${lineLabel(c)}${partLabel(c)}${status}`,
         "",
-        blockQuote(c.anchor.quote),
+        blockQuote(quotedSource(c)),
         "",
         `**Comment:** ${c.body || "_(no note)_"}`,
       ].join("\n");
@@ -65,7 +81,10 @@ export function toJSON(
         c.anchor.sourceLineStart != null
           ? [c.anchor.sourceLineStart, c.anchor.sourceLineEnd ?? c.anchor.sourceLineStart]
           : null,
-      quote: c.anchor.quote,
+      quote: quotedSource(c),
+      diagram: c.anchor.part
+        ? { kind: c.anchor.part.kind, key: c.anchor.part.key, label: c.anchor.quote }
+        : null,
       body: c.body,
       status: c.status,
     }));

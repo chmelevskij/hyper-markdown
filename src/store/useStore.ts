@@ -38,6 +38,8 @@ interface AppState {
   safeMode: boolean;
   showResolved: boolean;
   sidebarWidth: number;
+  /** Max width (px) of the rendered text column. */
+  contentWidth: number;
 
   loadDocument: (doc: LoadedDocument) => Promise<void>;
   openDocument: () => Promise<void>;
@@ -60,6 +62,7 @@ interface AppState {
   toggleSafeMode: () => void;
   toggleShowResolved: () => void;
   setSidebarWidth: (w: number) => void;
+  setContentWidth: (w: number) => void;
   bumpRender: () => void;
 }
 
@@ -68,6 +71,11 @@ const LS_SESSION = "hmd:session";
 
 export const SIDEBAR_MIN = 260;
 export const SIDEBAR_MAX = 620;
+
+/** Text column bounds — narrow enough to stay readable, wide enough for tables. */
+export const CONTENT_MIN = 480;
+export const CONTENT_MAX = 1600;
+export const CONTENT_DEFAULT = 740;
 
 /** Stable empties so selectors don't allocate when there is no active tab. */
 const EMPTY_COMMENTS: Comment[] = [];
@@ -82,13 +90,17 @@ export const activeComments = (s: AppState): Comment[] =>
 export const activeChanges = (s: AppState): Record<string, CommentChange> =>
   activeTab(s)?.changes ?? EMPTY_CHANGES;
 
-type Prefs = Pick<AppState, "mode" | "viewMode" | "safeMode" | "sidebarWidth">;
+type Prefs = Pick<
+  AppState,
+  "mode" | "viewMode" | "safeMode" | "sidebarWidth" | "contentWidth"
+>;
 
 const DEFAULT_PREFS: Prefs = {
   mode: "light",
   viewMode: "comment",
   safeMode: false,
   sidebarWidth: 340,
+  contentWidth: CONTENT_DEFAULT,
 };
 
 function loadPrefs(): Prefs {
@@ -107,6 +119,7 @@ function savePrefs(s: AppState) {
     viewMode: s.viewMode,
     safeMode: s.safeMode,
     sidebarWidth: s.sidebarWidth,
+    contentWidth: s.contentWidth,
   };
   localStorage.setItem(LS_PREFS, JSON.stringify(prefs));
 }
@@ -138,6 +151,8 @@ function loadSession(): { paths: string[]; active: string | null } {
 }
 
 const clampWidth = (w: number) => Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w));
+const clampContent = (w: number) =>
+  Math.round(Math.min(CONTENT_MAX, Math.max(CONTENT_MIN, w)));
 
 async function persistComments(doc: LoadedDocument, comments: Comment[]) {
   const file: CommentFile = { version: 2, document: doc.path, comments };
@@ -386,6 +401,10 @@ export const useStore = create<AppState>((set, get) => ({
   },
   setSidebarWidth(w) {
     set({ sidebarWidth: clampWidth(w) });
+    savePrefs(get());
+  },
+  setContentWidth(w) {
+    set({ contentWidth: clampContent(w) });
     savePrefs(get());
   },
   bumpRender() {
