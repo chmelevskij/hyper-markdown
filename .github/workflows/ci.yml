@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  commits:
+    name: Commit descriptions
+    # The version bump and the CHANGELOG are generated from these. Local jj has
+    # no hook mechanism to reject a bad one, so this is the enforcing gate — it
+    # runs on pushes to main as well as on pull requests.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Work out which commits are new
+        id: range
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: |
+          if [ "$EVENT" = "pull_request" ]; then
+            range="$PR_BASE..$PR_HEAD"
+          elif [ -n "$BEFORE" ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            # Not a first push or a force-push onto a discarded history.
+            range="$BEFORE..$SHA"
+          else
+            range="$SHA~1..$SHA"
+          fi
+          echo "range=$range" >> "$GITHUB_OUTPUT"
+          echo "Checking $range"
+      - run: node scripts/check-commit-msg.mjs --range "${{ steps.range.outputs.range }}"
+
+  build:
+    name: Typecheck & build
+    # ubuntu-22.04 (not -latest) to match the release matrix: same webkit2gtk
+    # version, so a Rust break shows up here and not mid-release.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libxdo-dev \
+            libssl-dev \
+            build-essential \
+            curl wget file patchelf
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - run: pnpm install --frozen-lockfile
+
+      # `tsc && vite build` — also produces dist/, which tauri-build requires.
+      - run: pnpm build
+
+      - run: cargo check --manifest-path src-tauri/Cargo.toml --all-targets

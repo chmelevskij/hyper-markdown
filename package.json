@@ -3,14 +3,17 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "packageManager": "pnpm@10.12.4",
   "scripts": {
+    "prepare": "node scripts/install-hooks.mjs",
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
     "app:build": "tauri build",
     "app:install": "bash scripts/install-macos.sh",
-    "comments": "node .claude/skills/hmd-comments/digest.mjs"
+    "comments": "node .claude/skills/hmd-comments/digest.mjs",
+    "lint:commits": "node scripts/check-commit-msg.mjs"
   },
   "dependencies": {
     "@fontsource-variable/hanken-grotesk": "^5.2.8",
