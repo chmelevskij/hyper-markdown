@@ -1,0 +1,109 @@
+name: Release
+
+# Every push to main is scanned by release-please. It reads the Conventional
+# Commit messages since the last release, works out the next version, and keeps
+# an open "chore(release): vX.Y.Z" pull request holding the version bumps and
+# the generated CHANGELOG.md. Nothing is released until you merge that PR —
+# merging it creates the tag + GitHub Release, which is what fans out into the
+# platform build matrix below.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    name: Version & changelog
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      release_id: ${{ steps.release.outputs.id }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - uses: googleapis/release-please-action@v5
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  build:
+    name: ${{ matrix.name }}
+    needs: prepare
+    if: needs.prepare.outputs.release_created == 'true'
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # macos-latest is Apple Silicon — an arm64 build needs no
+          # cross-compilation, only the explicit target so the bundle path is
+          # predictable. (macos-13 is the last Intel runner, if ever needed.)
+          - name: macOS (Apple Silicon)
+            runner: macos-latest
+            target: aarch64-apple-darwin
+            args: --target aarch64-apple-darwin
+          - name: Linux (x86_64)
+            runner: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            args: ""
+          - name: Windows (x86_64)
+            runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            args: ""
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Linux build dependencies
+        if: matrix.runner == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libxdo-dev \
+            libssl-dev \
+            build-essential \
+            curl wget file patchelf
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: ${{ matrix.target }}
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Upload into the release release-please just created, rather than
+          # creating a second one.
+          releaseId: ${{ needs.prepare.outputs.release_id }}
+          tauriScript: pnpm tauri
+          args: ${{ matrix.args }}
