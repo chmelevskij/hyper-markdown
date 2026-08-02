@@ -1,0 +1,11 @@
+#!/bin/sh
+#
+# Reject commit messages that aren't Conventional Commits — the release version
+# and CHANGELOG are generated from them.
+#
+# NOTE: this repo is driven by jj, and **jj does not run git hooks**. This only
+# fires if someone commits through git in the colocated repo. The real checks
+# are `pnpm lint:commits` locally and the `commits` job in CI.
+#
+# Bypass for a one-off with: git commit --no-verify
+exec node "$(dirname "$0")/../scripts/check-commit-msg.mjs" --file "$1"
