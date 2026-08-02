@@ -49,6 +49,9 @@ Paste it into Claude Code (or any agent) and it has precise, line-anchored instr
 
 ## Develop
 
+Version control is [Jujutsu](https://jj-vcs.github.io/jj/) (`jj`), colocated
+with git — clone with either, but drive it with `jj`.
+
 ```bash
 pnpm install
 
@@ -80,6 +83,31 @@ hmd                          # just focus / launch the app
 
 `hmd` hands files to the app via macOS `open -a`, so it launches the app if needed
 and reuses the running window otherwise.
+
+## Releases
+
+Releases are generated from commit messages — no manual version bumps, no
+hand-written changelog.
+
+1. **Describe each change** with [Conventional Commits](https://www.conventionalcommits.org):
+   `jj describe -m "feat(mermaid): comment on individual diagram parts"`. See
+   [CLAUDE.md](./CLAUDE.md) for the type table. jj has no hook mechanism, so
+   check with `pnpm lint:commits` before pushing — CI enforces it either way.
+2. **Push to `main`** (`jj bookmark set main -r @` then `jj git push`).
+   `release-please` works out the next version from the
+   commit types — `feat` → minor, `fix` → patch — and keeps an open
+   **`chore(release): vX.Y.Z`** pull request holding the version bump and the
+   generated `CHANGELOG.md`. Nothing ships until you merge it.
+3. **Merge that PR.** It tags the release and triggers builds for **macOS
+   (Apple Silicon)**, **Linux x86_64** and **Windows x86_64**, which attach
+   their bundles to the GitHub Release.
+
+The version lives in three files — `package.json`, `src-tauri/tauri.conf.json`
+and `src-tauri/Cargo.toml` — all kept in step by `release-please-config.json`.
+Don't edit them by hand.
+
+Builds are unsigned, so macOS quarantines the `.dmg`: right-click ▸ **Open** the
+first time, or `xattr -dr com.apple.quarantine /Applications/hyper-markdown.app`.
 
 ## Architecture
 
