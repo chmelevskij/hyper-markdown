@@ -26,6 +26,29 @@ const supportsHighlights = typeof CSS !== "undefined" && "highlights" in CSS;
  */
 const scrollCache = new Map<string, number>();
 
+/**
+ * Where this mount still owes the reader a jump to: the offset they were at
+ * before switching away, or a heading a cross-document `#anchor` link named.
+ */
+type ScrollTarget = { kind: "offset"; value: number } | { kind: "fragment"; id: string };
+
+/**
+ * How long to keep re-applying that jump.
+ *
+ * Shiki and Mermaid replace their nodes well after the first commit, so the
+ * document keeps growing. Landing once is not enough for two reasons: early on
+ * the target may still be past the end of a short document, and once content
+ * above the viewport grows, the browser's *scroll anchoring* shifts scrollTop to
+ * keep the visible text still — which silently adds that growth to the offset
+ * (a saved 4000 came back as 4369, then 4739 on the next round trip). So we
+ * re-apply on every height change for this long, and only then let the reader's
+ * position be whatever it is.
+ */
+const SETTLE_MS = 3000;
+
+/** Events that mean the reader took over — we stop chasing our target. */
+const USER_SCROLL_EVENTS = ["wheel", "touchstart", "keydown", "mousedown"] as const;
+
 const escapeAttr = (s: string) =>
   typeof CSS !== "undefined" && CSS.escape ? CSS.escape(s) : s.replace(/["\\]/g, "\\$&");
 
@@ -75,6 +98,8 @@ export default function DocumentView() {
   const viewMode = useStore((s) => s.viewMode);
   const contentWidth = useStore((s) => s.contentWidth);
   const renderNonce = useStore((s) => activeTab(s)?.renderNonce ?? 0);
+  const pendingFragment = useStore((s) => activeTab(s)?.pendingFragment ?? null);
+  const clearPendingFragment = useStore((s) => s.clearPendingFragment);
   const addComment = useStore((s) => s.addComment);
   const selectComment = useStore((s) => s.selectComment);
   const setChanges = useStore((s) => s.setChanges);
@@ -90,7 +115,33 @@ export default function DocumentView() {
   // changes during our lifetime, and reading from the store on unmount would
   // give us the *next* active tab (the cleanup runs after activeTabId flips).
   const [tabId] = useState(() => useStore.getState().activeTabId);
-  const restoredScrollRef = useRef(false);
+  const targetRef = useRef<ScrollTarget | null>(null);
+  const deadlineRef = useRef(0);
+
+  /**
+   * Try to satisfy the outstanding scroll target, and drop it once satisfied.
+   * Called after every content commit and on every height change, because the
+   * thing we are scrolling to may not exist (or may be out of reach) yet.
+   */
+  const chaseScrollTarget = useCallback(() => {
+    const target = targetRef.current;
+    const scroller = scrollRef.current;
+    const root = rootRef.current;
+    if (!target || !scroller || !root) return;
+    if (Date.now() > deadlineRef.current) {
+      targetRef.current = null;
+      return;
+    }
+    if (target.kind === "fragment") {
+      const el = document.getElementById(target.id);
+      if (!el || !root.contains(el)) return; // not rendered yet — try again later
+      const top =
+        scroller.scrollTop + (el.getBoundingClientRect().top - scroller.getBoundingClientRect().top);
+      scroller.scrollTop = Math.max(0, top);
+      return;
+    }
+    scroller.scrollTop = target.value;
+  }, []);
 
   // Paint highlights using the CSS Custom Highlight API (no DOM mutation).
   const paintHighlights = useCallback(() => {
@@ -225,20 +276,65 @@ export default function DocumentView() {
   }, []);
 
   // Persist scroll position so switching tabs keeps the reader where they were.
-  // We write on every scroll (cheap Map write, no re-render) and also on
-  // unmount to capture the final position before React swaps the DOM.
+  // Every scroll updates the cache (a cheap Map write, no re-render), which is
+  // enough to always hold the current position.
+  //
+  // Deliberately NOT saved from the cleanup: React detaches the DOM node before
+  // effect cleanups run, and a detached element reports `scrollTop === 0`, so a
+  // "capture the final position on unmount" write only ever stored 0 — wiping
+  // the good value the scroll listener had already cached. Under StrictMode,
+  // whose mount → cleanup → mount cycle fires that cleanup on *every* mount, it
+  // wiped the position before the restore could even read it.
   useEffect(() => {
     const scroller = scrollRef.current;
     if (!scroller || !tabId) return;
-    const onScroll = () => {
-      scrollCache.set(tabId, scroller.scrollTop);
-    };
+    const onScroll = () => scrollCache.set(tabId, scroller.scrollTop);
     scroller.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      scrollCache.set(tabId, scroller.scrollTop);
-      scroller.removeEventListener("scroll", onScroll);
-    };
+    return () => scroller.removeEventListener("scroll", onScroll);
   }, [tabId]);
+
+  // Restore this tab's position on mount, and stop chasing it the moment the
+  // reader scrolls for themselves.
+  useEffect(() => {
+    const scroller = scrollRef.current;
+    if (!scroller) return;
+    const saved = tabId ? scrollCache.get(tabId) : undefined;
+    if (saved) {
+      targetRef.current = { kind: "offset", value: saved };
+      deadlineRef.current = Date.now() + SETTLE_MS;
+      chaseScrollTarget();
+    }
+    const cancel = () => {
+      targetRef.current = null;
+    };
+    for (const evt of USER_SCROLL_EVENTS) {
+      scroller.addEventListener(evt, cancel, { passive: true });
+    }
+    return () => {
+      for (const evt of USER_SCROLL_EVENTS) scroller.removeEventListener(evt, cancel);
+    };
+  }, [tabId, chaseScrollTarget]);
+
+  // A cross-document `#heading` link. It outranks the saved offset — the reader
+  // asked for this exact spot — and is consumed here rather than at load time
+  // because the heading does not exist until this document has rendered.
+  useEffect(() => {
+    if (!pendingFragment || !tabId) return;
+    targetRef.current = { kind: "fragment", id: decodeURIComponent(pendingFragment) };
+    deadlineRef.current = Date.now() + SETTLE_MS;
+    chaseScrollTarget();
+    clearPendingFragment(tabId);
+  }, [pendingFragment, tabId, clearPendingFragment, chaseScrollTarget]);
+
+  // Async content (Shiki, Mermaid) keeps changing the height after the first
+  // commit; re-aim at the target whenever it does.
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => chaseScrollTarget());
+    ro.observe(root);
+    return () => ro.disconnect();
+  }, [chaseScrollTarget]);
 
   // Capture a selection inside the content into a pending comment.
   const onMouseUp = useCallback(() => {
@@ -324,18 +420,9 @@ export default function DocumentView() {
     requestAnimationFrame(() => {
       paintHighlights();
       classify();
-      // Restore once, after the first content commit, so the browser has a real
-      // scrollHeight to clamp against. Subsequent renders (live reload, async
-      // shiki/mermaid mutations) leave the user's current position alone.
-      if (!restoredScrollRef.current) {
-        restoredScrollRef.current = true;
-        const saved = tabId ? scrollCache.get(tabId) : undefined;
-        if (saved != null && scrollRef.current) {
-          scrollRef.current.scrollTop = saved;
-        }
-      }
+      chaseScrollTarget();
     });
-  }, [paintHighlights, classify, tabId]);
+  }, [paintHighlights, classify, chaseScrollTarget]);
 
   // Open a relative/absolute link target. Markdown files open as a new tab;
   // a same-document fragment scrolls in place; anything else is handed off to
@@ -352,7 +439,8 @@ export default function DocumentView() {
       if (isMarkdownPath(target.path)) {
         const opened = await platform.readDocument(target.path).catch(() => null);
         if (opened) {
-          await loadDocument(opened);
+          // Carry the `#heading` through: the tab that renders it does the scroll.
+          await loadDocument(opened, target.fragment);
           return;
         }
       }
