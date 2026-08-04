@@ -28,6 +28,12 @@ export interface Tab {
   changes: Record<string, CommentChange>;
   /** Bumped whenever this tab's rendered DOM changes so highlights re-resolve. */
   renderNonce: number;
+  /**
+   * Heading id a cross-document `#anchor` link asked us to land on. The target
+   * heading does not exist until this tab has rendered, so DocumentView consumes
+   * it once the content is on screen rather than at load time.
+   */
+  pendingFragment?: string | null;
 }
 
 interface AppState {
@@ -41,7 +47,9 @@ interface AppState {
   /** Max width (px) of the rendered text column. */
   contentWidth: number;
 
-  loadDocument: (doc: LoadedDocument) => Promise<void>;
+  /** `fragment` is a heading id to scroll to once the document has rendered. */
+  loadDocument: (doc: LoadedDocument, fragment?: string) => Promise<void>;
+  clearPendingFragment: (id: string) => void;
   openDocument: () => Promise<void>;
   restoreSession: () => Promise<void>;
   closeTab: (id: string) => void;
@@ -195,16 +203,26 @@ export const useStore = create<AppState>((set, get) => ({
   ...loadPrefs(),
   showResolved: false,
 
-  async loadDocument(doc) {
-    // Re-opening an already-open document just activates its tab.
+  async loadDocument(doc, fragment) {
+    // Re-opening an already-open document just activates its tab — but a link
+    // that named a heading still has to take the reader there.
     const existing = get().tabs.find((t) => t.doc.path === doc.path);
     if (existing) {
       set({ activeTabId: existing.id });
+      if (fragment) patchTab(set, existing.id, () => ({ pendingFragment: fragment }));
       persistSession(get());
       return;
     }
     const id = uid();
-    const tab: Tab = { id, doc, comments: [], selectedId: null, changes: {}, renderNonce: 0 };
+    const tab: Tab = {
+      id,
+      doc,
+      comments: [],
+      selectedId: null,
+      changes: {},
+      renderNonce: 0,
+      pendingFragment: fragment ?? null,
+    };
     set((s) => ({ tabs: [...s.tabs, tab], activeTabId: id }));
     persistSession(get());
     // Hydrate any saved comments for this document.
@@ -218,6 +236,12 @@ export const useStore = create<AppState>((set, get) => ({
       }
     } catch (e) {
       console.error("Failed to load comments", e);
+    }
+  },
+
+  clearPendingFragment(id) {
+    if (get().tabs.some((t) => t.id === id && t.pendingFragment)) {
+      patchTab(set, id, () => ({ pendingFragment: null }));
     }
   },
 
