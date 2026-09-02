@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.1](https://github.com/frontendara/hyper-markdown/compare/v0.2.0...v0.2.1) (2026-08-04)
+
+
+### Bug Fixes
+
+* **tabs:** keep scroll position and follow cross-document anchors ([c3cabb5](https://github.com/frontendara/hyper-markdown/commit/c3cabb59ba21394248fac5ff17eaf876099a89a0))
+* **tabs:** keep scroll position and follow cross-document anchors ([d5dd607](https://github.com/frontendara/hyper-markdown/commit/d5dd607ab929b2daf325c2c85c9acf73538ab98c))
+
+
+### Documentation
+
+* rewrite the readme and retire PLAN.md ([934c1c8](https://github.com/frontendara/hyper-markdown/commit/934c1c8b299512df1a9782e134596fb6e11a9dc7))
+* rewrite the readme and retire PLAN.md ([9e22f7d](https://github.com/frontendara/hyper-markdown/commit/9e22f7de9197ea048268c52d651530dbfbc0b633))
+
 ## [0.2.0](https://github.com/frontendara/hyper-markdown/compare/v0.1.0...v0.2.0) (2026-08-02)
 
 
