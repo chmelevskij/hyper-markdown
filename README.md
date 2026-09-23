@@ -86,6 +86,25 @@ Builds are **unsigned**, so the OS objects the first time:
 - **Persistent comments** — saved to a sidecar `<name>.hmd-comments.json` next to the
   document, so they travel with the file and can be committed.
 
+### GitHub pull requests
+
+- **Sign in** — the toolbar's ⎇ GitHub button signs in with GitHub's device flow (a
+  code to type into the browser; nothing to paste). The token is kept in the OS keychain
+  and never enters the webview. A pasted token works too, and is the only option in the
+  browser preview.
+- **Link a document to a PR** — for a document inside a git checkout, *Link pull request*
+  finds the open PR for the current branch; otherwise paste a PR URL.
+- **Pull** — every review thread on that file lands as a comment anchored to the thread's
+  lines at the PR head, with a baseline so edits under it are flagged like any other
+  comment. Replies come along in the body; resolved threads arrive resolved.
+- **Push** — comments not yet on GitHub go up as one PR review with inline comments.
+  Diagram-part comments name the part and land on the fenced block. Lines outside the
+  diff can't take inline comments, so those go into a single PR comment with permalinks.
+- **Resolve** — resolving or reopening a pulled comment resolves or reopens the thread on
+  GitHub, and vice versa on the next pull.
+
+The GitHub App behind the sign-in is provisioned from [`infra/`](./infra/README.md).
+
 ### Safety & theming
 
 - **Safe mode** — render MDX as plain Markdown, executing none of it, for untrusted files.
@@ -151,6 +170,13 @@ macOS (WKWebView) and Linux (WebKitGTK) but **Chromium** on Windows (WebView2) �
 `pnpm dev` and the driver run Chrome. Anything engine-sensitive (the CSS Custom Highlight
 API in particular) needs a real `pnpm tauri dev` check, and Linux's WebKitGTK is the one
 most likely to lag.
+
+### GitHub sign-in in a local build
+
+Device-flow sign-in needs the GitHub App's client id at build time. Copy `.env.example` to
+`.env.local` and set `VITE_GITHUB_CLIENT_ID` (an output of `pulumi up` in `infra/`). Without
+it the app still works, but sign-in falls back to pasting a token. Release builds get the
+id from the repository's `HMD_GITHUB_CLIENT_ID` Actions variable, which `infra/` sets.
 
 ### Install the built app (macOS)
 
@@ -241,6 +267,9 @@ The comment, anchor and sidecar shapes are defined and commented in **`src/types
 - **The `hmd` CLI and the OS open-file handoff are macOS-only.** Linux and Windows build
   and run, but opening files from the command line there needs single-instance argv
   forwarding, which isn't wired up.
-- **Imported comments carry no baseline**, so they get no untouched/edited/removed badge —
-  and one whose quote no longer appears in the document is silently dropped rather than
-  flagged as unanchored.
+- **Imported comments carry no baseline** (pulled ones do), so they get no
+  untouched/edited/removed badge. A comment whose quote no longer appears in the document
+  falls back to highlighting the blocks rendered from its source lines, or is dropped when
+  it has none.
+- **GitHub sync is on demand.** Pull and push are buttons, not a live connection, and a
+  pulled comment's body is only refreshed from GitHub while you haven't edited it locally.
