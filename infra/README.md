@@ -24,7 +24,7 @@ outputs.
 ```bash
 cd infra
 pnpm install
-pulumi stack select prod        # or: pulumi stack init prod
+pulumi stack select hmd         # or: pulumi stack init hmd
 export GITHUB_TOKEN=$(gh auth token)   # for the Actions variables (repo admin)
 pulumi up
 ```
@@ -54,7 +54,7 @@ Then put the client id where builds can see it:
 | `appName` | `hyper-markdown` | display name; must be unique on github.com |
 | `organization` | _(empty)_ | register the app under an organisation instead of your account |
 
-`Pulumi.prod.yaml` holds the `prod` stack's values.
+`Pulumi.hmd.yaml` holds the `hmd` stack's values.
 
 ## Caveats
 
