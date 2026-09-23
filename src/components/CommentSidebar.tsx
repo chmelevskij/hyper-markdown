@@ -4,6 +4,7 @@ import { platform } from "../platform";
 import { toJSON, toMarkdown } from "../lib/export";
 import { parseImport } from "../lib/importComments";
 import type { Comment, CommentChange } from "../types";
+import PullRequestPanel from "./PullRequestPanel";
 
 const CHANGE_LABEL: Record<CommentChange["state"], string> = {
   untouched: "untouched",
@@ -62,6 +63,20 @@ function CommentCard({
         )}
         {state && (
           <span className={`change-badge change-badge--${state}`}>{CHANGE_LABEL[state]}</span>
+        )}
+        {comment.github && (
+          <a
+            className="comment-card__gh"
+            href={comment.github.url}
+            title={`On GitHub · @${comment.github.author}${comment.github.remoteResolved ? " · resolved" : ""}`}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              platform.openExternal(comment.github!.url);
+            }}
+          >
+            ⎇ @{comment.github.author}
+          </a>
         )}
         <div className="comment-card__actions">
           <button
@@ -255,6 +270,7 @@ export default function CommentSidebar({ width }: { width: number }) {
         <button className="btn btn--ghost" onClick={importFile}>
           Import comments…
         </button>
+        <PullRequestPanel flash={flash} />
         <label className="sidebar__toggle">
           <input type="checkbox" checked={showResolved} onChange={toggleShowResolved} />
           Show resolved

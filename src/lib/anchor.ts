@@ -145,8 +145,43 @@ function resolveAgainstText(root: HTMLElement, full: string, anchor: Anchor): Ra
     }
     from = idx + 1;
   }
-  if (bestIndex === -1) return null;
-  return rangeFromOffsets(root, bestIndex, bestIndex + anchor.quote.length);
+  if (bestIndex !== -1) {
+    return rangeFromOffsets(root, bestIndex, bestIndex + anchor.quote.length);
+  }
+
+  // Last resort: the quote is source Markdown that never appears verbatim in
+  // the rendered text (imported or pulled from GitHub). Cover the blocks that
+  // were rendered from its source lines instead.
+  if (anchor.sourceLineStart != null) {
+    return rangeFromSourceLines(root, anchor.sourceLineStart, anchor.sourceLineEnd ?? anchor.sourceLineStart);
+  }
+  return null;
+}
+
+/**
+ * A Range spanning every line-stamped block that overlaps the given 1-based
+ * source line range, or null when nothing rendered from those lines.
+ */
+export function rangeFromSourceLines(root: HTMLElement, start: number, end: number): Range | null {
+  const lo = Math.min(start, end);
+  const hi = Math.max(start, end);
+  let first: Element | null = null;
+  let last: Element | null = null;
+  for (const el of root.querySelectorAll<HTMLElement>("[data-src-start]")) {
+    const s = Number(el.dataset.srcStart);
+    const e = Number(el.dataset.srcEnd ?? el.dataset.srcStart);
+    if (Number.isNaN(s) || e < lo || s > hi) continue;
+    // Skip ancestors that merely contain an already-chosen block, so a list
+    // item does not widen the range to its whole list.
+    if (first && el.contains(first)) continue;
+    if (!first) first = el;
+    last = el;
+  }
+  if (!first || !last) return null;
+  const range = document.createRange();
+  range.setStart(first, 0);
+  range.setEnd(last, last.childNodes.length);
+  return range.collapsed ? null : range;
 }
 
 function commonPrefix(a: string, b: string): number {

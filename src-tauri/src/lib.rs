@@ -1,3 +1,5 @@
+mod github;
+
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -183,7 +185,14 @@ pub fn run() {
             path_exists,
             watch_file,
             unwatch_file,
-            take_pending_files
+            take_pending_files,
+            github::github_auth_status,
+            github::github_set_token,
+            github::github_logout,
+            github::github_device_start,
+            github::github_device_poll,
+            github::github_request,
+            github::git_repo_info
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

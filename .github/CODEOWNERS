@@ -1,0 +1,4 @@
+# Every change needs the repository owner's approval before it can merge
+# (the `main` ruleset requires a code-owner review). The owner, as repository
+# admin, bypasses the rule for their own pull requests.
+* @chmelevskij

@@ -51,6 +51,14 @@ export default function App() {
     return platform.onOpenFile(loadDocument);
   }, [restoreSession, loadDocument]);
 
+  // Who is signed in to GitHub (the token lives in the keychain / localStorage).
+  useEffect(() => {
+    platform.github
+      .status()
+      .then((u) => useStore.getState().setGithubUser(u))
+      .catch(() => useStore.getState().setGithubUser(null));
+  }, []);
+
   // Live reload: watch every open document and refresh on external edits.
   const pathsKey = tabs.map((t) => t.doc.path).join("\n");
   useEffect(() => {
