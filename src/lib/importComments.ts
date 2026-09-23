@@ -1,4 +1,4 @@
-import type { Anchor, CommentStatus } from "../types";
+import type { Anchor, Baseline, CommentStatus } from "../types";
 
 /** A comment recovered from an exported file, pre-anchor-reconstruction. */
 export interface ImportedComment {
@@ -7,6 +7,8 @@ export interface ImportedComment {
   /** Full anchor when importing a sidecar file; partial (quote + lines) otherwise. */
   anchor: Anchor;
   color?: string;
+  /** Source snapshot when the importer knows it (e.g. the PR head commit). */
+  baseline?: Baseline;
 }
 
 function makeAnchor(partial: Partial<Anchor> & { quote: string }): Anchor {
