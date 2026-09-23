@@ -38,6 +38,9 @@ owns it); the tab says *Done* and Pulumi finishes. Then two things that have no 
    A GitHub App's user token only reaches repositories the app is installed on, so
    each org or user whose PRs you want to see needs one install. The app is public, so
    anyone can do that for their own repos.
+3. **Upload the logo** — `public/github-app-icon.png` (1024², rendered from the SVG next
+   to it with `rsvg-convert`) under *Display information*, badge background `#161616`.
+   The manifest flow has no field for it.
 
 Then put the client id where builds can see it:
 
