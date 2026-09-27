@@ -1,0 +1,4 @@
+config:
+  hyper-markdown-infra:repoOwner: chmelevskij
+  hyper-markdown-infra:repoName: hyper-markdown
+  hyper-markdown-infra:appName: hyper-markdown

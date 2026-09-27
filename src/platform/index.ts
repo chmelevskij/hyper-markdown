@@ -5,6 +5,39 @@
  */
 import type { LoadedDocument } from "../types";
 
+/** Who is signed in to GitHub. */
+export interface GithubUser {
+  login: string;
+  avatar_url?: string | null;
+}
+
+/** Device-flow handshake returned by GitHub (shown to the user, then polled). */
+export interface DeviceCode {
+  device_code: string;
+  user_code: string;
+  verification_uri: string;
+  expires_in: number;
+  interval: number;
+}
+
+export interface ApiResponse {
+  status: number;
+  body: unknown;
+}
+
+/** The git repository a document belongs to. */
+export interface RepoInfo {
+  root: string;
+  host: string;
+  owner: string;
+  repo: string;
+  branch: string | null;
+  rel_path: string;
+}
+
+const GH_CLIENT_ID = (import.meta.env.VITE_GITHUB_CLIENT_ID as string | undefined) ?? "";
+const LS_GH_TOKEN = "hmd:github:token";
+
 export const isTauri = (): boolean =>
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
@@ -92,6 +125,48 @@ async function tauriOnFileDrop(cb: (doc: LoadedDocument) => void): Promise<() =>
 // ---------------------------------------------------------------------------
 // Browser fallback
 // ---------------------------------------------------------------------------
+
+/**
+ * Browser preview keeps a pasted token in localStorage and calls the API with
+ * fetch — api.github.com sends CORS headers, the device-flow endpoints do not,
+ * so sign-in there is token-paste only.
+ */
+async function browserGithubRequest(
+  method: string,
+  path: string,
+  body?: unknown,
+): Promise<ApiResponse> {
+  const token = localStorage.getItem(LS_GH_TOKEN);
+  if (!token) throw new Error("Not signed in to GitHub");
+  const url = path.startsWith("http") ? path : `https://api.github.com${path}`;
+  const res = await fetch(url, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+      ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+    },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  const text = await res.text();
+  let parsed: unknown = text;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    /* keep text */
+  }
+  return { status: res.status, body: parsed };
+}
+
+async function browserWhoami(token: string): Promise<GithubUser> {
+  const res = await fetch("https://api.github.com/user", {
+    headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" },
+  });
+  if (!res.ok) throw new Error(`GitHub rejected the token (HTTP ${res.status})`);
+  const u = (await res.json()) as GithubUser;
+  return { login: u.login, avatar_url: u.avatar_url };
+}
 
 function browserPickFile(): Promise<LoadedDocument | null> {
   return new Promise((resolve) => {
@@ -255,6 +330,81 @@ export const platform = {
     a.click();
     URL.revokeObjectURL(url);
     return defaultName;
+  },
+
+  /** Open a URL in the system browser. */
+  async openExternal(url: string): Promise<void> {
+    if (isTauri()) {
+      const { openUrl } = await import("@tauri-apps/plugin-opener");
+      await openUrl(url);
+      return;
+    }
+    window.open(url, "_blank", "noopener");
+  },
+
+  /** Which git repository (and remote) a document lives in. Tauri only. */
+  async repoForPath(docPath: string): Promise<RepoInfo | null> {
+    if (!isTauri()) return null;
+    const { invoke } = await import("@tauri-apps/api/core");
+    return (await invoke<RepoInfo | null>("git_repo_info", { path: docPath })) ?? null;
+  },
+
+  github: {
+    /** Client id of the GitHub App; empty when the build was made without one. */
+    clientId: GH_CLIENT_ID,
+    /** Device flow needs the native side (github.com sends no CORS headers). */
+    canDeviceFlow: () => isTauri() && GH_CLIENT_ID !== "",
+
+    async status(): Promise<GithubUser | null> {
+      if (isTauri()) {
+        const { invoke } = await import("@tauri-apps/api/core");
+        return (await invoke<GithubUser | null>("github_auth_status")) ?? null;
+      }
+      const token = localStorage.getItem(LS_GH_TOKEN);
+      if (!token) return null;
+      try {
+        return await browserWhoami(token);
+      } catch {
+        return null;
+      }
+    },
+
+    async deviceStart(): Promise<DeviceCode> {
+      const { invoke } = await import("@tauri-apps/api/core");
+      return invoke<DeviceCode>("github_device_start", { clientId: GH_CLIENT_ID });
+    },
+
+    async devicePoll(code: DeviceCode): Promise<GithubUser> {
+      const { invoke } = await import("@tauri-apps/api/core");
+      return invoke<GithubUser>("github_device_poll", { clientId: GH_CLIENT_ID, code });
+    },
+
+    async setToken(token: string): Promise<GithubUser> {
+      if (isTauri()) {
+        const { invoke } = await import("@tauri-apps/api/core");
+        return invoke<GithubUser>("github_set_token", { token });
+      }
+      const user = await browserWhoami(token.trim());
+      localStorage.setItem(LS_GH_TOKEN, token.trim());
+      return user;
+    },
+
+    async logout(): Promise<void> {
+      if (isTauri()) {
+        const { invoke } = await import("@tauri-apps/api/core");
+        await invoke("github_logout");
+        return;
+      }
+      localStorage.removeItem(LS_GH_TOKEN);
+    },
+
+    async request(method: string, path: string, body?: unknown): Promise<ApiResponse> {
+      if (isTauri()) {
+        const { invoke } = await import("@tauri-apps/api/core");
+        return invoke<ApiResponse>("github_request", { method, path, body: body ?? null });
+      }
+      return browserGithubRequest(method, path, body);
+    },
   },
 
   async copyToClipboard(text: string): Promise<void> {

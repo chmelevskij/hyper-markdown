@@ -52,6 +52,35 @@ export interface Baseline {
   capturedAt: string;
 }
 
+/** A pull request a document's comments are linked to. */
+export interface GithubPr {
+  owner: string;
+  repo: string;
+  number: number;
+  url: string;
+  /** Head commit the last pull anchored against. */
+  headSha?: string;
+  /** Document path relative to the repository root. */
+  path: string;
+}
+
+/** Where a comment lives on GitHub, once it has been pulled from or pushed to a PR. */
+export interface GithubLink {
+  /** REST id of the thread's first review comment. */
+  commentId: number;
+  /** GraphQL node id of that comment. */
+  nodeId: string;
+  /** GraphQL id of the review thread — needed to resolve / unresolve. Learned on pull. */
+  threadId?: string;
+  url: string;
+  author: string;
+  /** Thread resolved state on GitHub as of the last sync. */
+  remoteResolved: boolean;
+  /** Body as composed from the remote thread at last sync, to detect local edits. */
+  remoteBody: string;
+  syncedAt: string;
+}
+
 export interface Comment {
   id: string;
   /** Document the comment belongs to (absolute path, or "untitled" in browser). */
@@ -64,6 +93,8 @@ export interface Comment {
   color: string;
   anchor: Anchor;
   baseline?: Baseline;
+  /** Present once the comment is mirrored on a GitHub pull request. */
+  github?: GithubLink;
 }
 
 /** How the source under a comment compares to its baseline (derived at runtime). */
@@ -90,7 +121,9 @@ export interface LoadedDocument {
 
 /** Serialized sidecar file written next to a document / into app data. */
 export interface CommentFile {
-  version: 1 | 2;
+  version: 1 | 2 | 3;
   document: string;
   comments: Comment[];
+  /** v3: the pull request this document's comments sync with. */
+  github?: GithubPr | null;
 }

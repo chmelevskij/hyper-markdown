@@ -1,0 +1,16 @@
+{
+  "name": "hyper-markdown-infra",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@pulumi/github": "^6.7.0",
+    "@pulumi/pulumi": "^3.190.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "typescript": "~5.8.3"
+  }
+}

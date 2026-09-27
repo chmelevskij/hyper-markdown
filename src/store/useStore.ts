@@ -1,6 +1,23 @@
 import { create } from "zustand";
-import type { Anchor, Comment, CommentChange, CommentFile, LoadedDocument } from "../types";
+import type {
+  Anchor,
+  Comment,
+  CommentChange,
+  CommentFile,
+  GithubLink,
+  GithubPr,
+  LoadedDocument,
+} from "../types";
 import { platform } from "../platform";
+import type { GithubUser } from "../platform";
+import {
+  fetchFileAt,
+  fetchPrSummary,
+  fetchThreads,
+  pushComments,
+  setThreadResolved,
+  threadsToComments,
+} from "../lib/github";
 import { uid } from "../lib/id";
 import { hashSource, sliceSourceLines } from "../lib/changes";
 import type { ImportedComment } from "../lib/importComments";
@@ -34,6 +51,15 @@ export interface Tab {
    * it once the content is on screen rather than at load time.
    */
   pendingFragment?: string | null;
+  /** Pull request this document's comments sync with (persisted in the sidecar). */
+  pr: GithubPr | null;
+}
+
+export interface SyncReport {
+  added: number;
+  updated: number;
+  pushed: number;
+  summarized: number;
 }
 
 interface AppState {
@@ -46,6 +72,10 @@ interface AppState {
   sidebarWidth: number;
   /** Max width (px) of the rendered text column. */
   contentWidth: number;
+  /** Signed-in GitHub user, null when signed out, undefined until checked. */
+  githubUser: GithubUser | null | undefined;
+  /** A GitHub sync is in flight for the active tab. */
+  githubBusy: boolean;
 
   /** `fragment` is a heading id to scroll to once the document has rendered. */
   loadDocument: (doc: LoadedDocument, fragment?: string) => Promise<void>;
@@ -64,6 +94,14 @@ interface AppState {
   deleteComment: (id: string) => void;
   selectComment: (id: string | null) => void;
   setChanges: (changes: Record<string, CommentChange>) => void;
+
+  setGithubUser: (u: GithubUser | null) => void;
+  /** Link (or unlink with null) the active document to a pull request. */
+  linkPr: (pr: GithubPr | null) => void;
+  /** Pull review threads for the linked PR into this document's comments. */
+  pullFromGithub: () => Promise<SyncReport>;
+  /** Push comments that are not yet on GitHub as one PR review. */
+  pushToGithub: () => Promise<SyncReport>;
 
   setMode: (m: Mode) => void;
   setViewMode: (v: ViewMode) => void;
@@ -162,8 +200,8 @@ const clampWidth = (w: number) => Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w)
 const clampContent = (w: number) =>
   Math.round(Math.min(CONTENT_MAX, Math.max(CONTENT_MIN, w)));
 
-async function persistComments(doc: LoadedDocument, comments: Comment[]) {
-  const file: CommentFile = { version: 2, document: doc.path, comments };
+async function persistComments(doc: LoadedDocument, comments: Comment[], pr: GithubPr | null = null) {
+  const file: CommentFile = { version: 3, document: doc.path, comments, github: pr };
   try {
     await platform.saveComments(doc.path, JSON.stringify(file, null, 2));
   } catch (e) {
@@ -197,11 +235,42 @@ function patchTab(
   set((s) => ({ tabs: s.tabs.map((t) => (t.id === id ? { ...t, ...updater(t) } : t)) }));
 }
 
+/**
+ * Mirror a local resolve / reopen onto the GitHub thread, when the comment has
+ * one. Fire-and-forget: a failure leaves the local state as the user set it and
+ * the next pull reconciles.
+ */
+function syncResolution(
+  get: () => AppState,
+  set: (fn: (s: AppState) => Partial<AppState>) => void,
+  tabId: string,
+  commentId: string,
+  resolved: boolean,
+) {
+  const tab = get().tabs.find((t) => t.id === tabId);
+  const c = tab?.comments.find((x) => x.id === commentId);
+  const threadId = c?.github?.threadId;
+  if (!tab || !c?.github || !threadId || c.github.remoteResolved === resolved) return;
+  setThreadResolved(threadId, resolved)
+    .then(() => {
+      const t = get().tabs.find((x) => x.id === tabId);
+      if (!t) return;
+      const next = t.comments.map((x) =>
+        x.id === commentId && x.github ? { ...x, github: { ...x.github, remoteResolved: resolved } } : x,
+      );
+      patchTab(set, tabId, () => ({ comments: next }));
+      persistComments(t.doc, next, t.pr);
+    })
+    .catch((e) => console.error("GitHub resolve failed", e));
+}
+
 export const useStore = create<AppState>((set, get) => ({
   tabs: [],
   activeTabId: null,
   ...loadPrefs(),
   showResolved: false,
+  githubUser: undefined,
+  githubBusy: false,
 
   async loadDocument(doc, fragment) {
     // Re-opening an already-open document just activates its tab — but a link
@@ -222,6 +291,7 @@ export const useStore = create<AppState>((set, get) => ({
       changes: {},
       renderNonce: 0,
       pendingFragment: fragment ?? null,
+      pr: null,
     };
     set((s) => ({ tabs: [...s.tabs, tab], activeTabId: id }));
     persistSession(get());
@@ -231,7 +301,7 @@ export const useStore = create<AppState>((set, get) => ({
       if (raw) {
         const parsed = JSON.parse(raw) as CommentFile;
         if (Array.isArray(parsed.comments)) {
-          patchTab(set, id, () => ({ comments: parsed.comments }));
+          patchTab(set, id, () => ({ comments: parsed.comments, pr: parsed.github ?? null }));
         }
       }
     } catch (e) {
@@ -321,7 +391,7 @@ export const useStore = create<AppState>((set, get) => ({
     };
     const next = [...comments, comment];
     patchTab(set, tab.id, () => ({ comments: next, selectedId: id }));
-    persistComments(doc, next);
+    persistComments(doc, next, tab.pr);
     return id;
   },
 
@@ -339,10 +409,11 @@ export const useStore = create<AppState>((set, get) => ({
       status: c.status,
       color: c.color ?? HIGHLIGHT_COLORS[(comments.length + idx) % HIGHLIGHT_COLORS.length],
       anchor: c.anchor,
+      baseline: c.baseline,
     }));
     const next = [...comments, ...added];
     patchTab(set, tab.id, () => ({ comments: next }));
-    persistComments(doc, next);
+    persistComments(doc, next, tab.pr);
     return added.length;
   },
 
@@ -353,7 +424,8 @@ export const useStore = create<AppState>((set, get) => ({
       c.id === id ? { ...c, ...patch, updatedAt: new Date().toISOString() } : c,
     );
     patchTab(set, tab.id, () => ({ comments: next }));
-    persistComments(tab.doc, next);
+    persistComments(tab.doc, next, tab.pr);
+    if (patch.status) syncResolution(get, set, tab.id, id, patch.status === "resolved");
   },
 
   resolveAsAddressed(id) {
@@ -375,7 +447,8 @@ export const useStore = create<AppState>((set, get) => ({
       return { ...c, status: "resolved" as const, baseline, updatedAt: now };
     });
     patchTab(set, tab.id, () => ({ comments: next }));
-    persistComments(tab.doc, next);
+    persistComments(tab.doc, next, tab.pr);
+    syncResolution(get, set, tab.id, id, true);
   },
 
   deleteComment(id) {
@@ -386,7 +459,7 @@ export const useStore = create<AppState>((set, get) => ({
       comments: next,
       selectedId: t.selectedId === id ? null : t.selectedId,
     }));
-    persistComments(tab.doc, next);
+    persistComments(tab.doc, next, tab.pr);
   },
 
   selectComment(id) {
@@ -402,6 +475,120 @@ export const useStore = create<AppState>((set, get) => ({
     // would re-render App → DocumentView and risk a reclassify feedback loop).
     if (changesEqual(tab.changes, changes)) return;
     patchTab(set, tab.id, () => ({ changes }));
+  },
+
+  setGithubUser(githubUser) {
+    set({ githubUser });
+  },
+
+  linkPr(pr) {
+    const tab = activeTab(get());
+    if (!tab) return;
+    patchTab(set, tab.id, () => ({ pr }));
+    persistComments(tab.doc, tab.comments, pr);
+  },
+
+  async pullFromGithub() {
+    const tab = activeTab(get());
+    const report: SyncReport = { added: 0, updated: 0, pushed: 0, summarized: 0 };
+    if (!tab?.pr) return report;
+    set({ githubBusy: true });
+    try {
+      const summary = await fetchPrSummary(tab.pr);
+      const [threads, fileText] = await Promise.all([
+        fetchThreads(tab.pr),
+        fetchFileAt(tab.pr, summary.headSha, tab.pr.path),
+      ]);
+      const pulled = threadsToComments(threads, tab.pr.path, fileText);
+      const now = new Date().toISOString();
+
+      // Re-read the tab: the fetch took a while and the user may have edited.
+      const fresh = get().tabs.find((t) => t.id === tab.id);
+      if (!fresh) return report;
+      const byCommentId = new Map(pulled.map((p) => [p.github.commentId, p]));
+      const seen = new Set<number>();
+      const resolveOps: { threadId: string; resolved: boolean }[] = [];
+
+      const next: Comment[] = fresh.comments.map((c) => {
+        if (!c.github) return c;
+        const remote = byCommentId.get(c.github.commentId);
+        if (!remote) return c;
+        seen.add(c.github.commentId);
+        const link: GithubLink = { ...remote.github, threadId: remote.github.threadId ?? c.github.threadId };
+        // Body: take the remote thread unless the user edited it locally.
+        const body = c.body === c.github.remoteBody ? remote.body : c.body;
+        // Status: a remote flip wins; otherwise a local flip is pushed.
+        let status = c.status;
+        if (remote.github.remoteResolved !== c.github.remoteResolved) {
+          status = remote.status;
+        } else if (c.status !== remote.status && link.threadId) {
+          resolveOps.push({ threadId: link.threadId, resolved: c.status === "resolved" });
+          link.remoteResolved = c.status === "resolved";
+        }
+        const changed = body !== c.body || status !== c.status;
+        if (changed) report.updated++;
+        return {
+          ...c,
+          body,
+          status,
+          github: link,
+          anchor: c.anchor.sourceLineStart == null ? remote.anchor : c.anchor,
+          updatedAt: changed ? now : c.updatedAt,
+        };
+      });
+
+      const added: Comment[] = pulled
+        .filter((p) => !seen.has(p.github.commentId))
+        .map((p, idx) => ({
+          id: uid(),
+          documentPath: fresh.doc.path,
+          createdAt: now,
+          updatedAt: now,
+          body: p.body,
+          status: p.status,
+          color: HIGHLIGHT_COLORS[(next.length + idx) % HIGHLIGHT_COLORS.length],
+          anchor: p.anchor,
+          baseline: p.baseline,
+          github: p.github,
+        }));
+      report.added = added.length;
+
+      const pr: GithubPr = { ...tab.pr, url: summary.url, headSha: summary.headSha };
+      const all = [...next, ...added];
+      patchTab(set, tab.id, () => ({ comments: all, pr }));
+      persistComments(fresh.doc, all, pr);
+      await Promise.all(resolveOps.map((op) => setThreadResolved(op.threadId, op.resolved)));
+      return report;
+    } finally {
+      set({ githubBusy: false });
+    }
+  },
+
+  async pushToGithub() {
+    const tab = activeTab(get());
+    const report: SyncReport = { added: 0, updated: 0, pushed: 0, summarized: 0 };
+    if (!tab?.pr) return report;
+    const pending = tab.comments.filter((c) => !c.github && c.status === "open");
+    if (pending.length === 0) return report;
+    set({ githubBusy: true });
+    try {
+      const headSha = (await fetchPrSummary(tab.pr)).headSha;
+      const { linked, summarized } = await pushComments({ ...tab.pr, headSha }, headSha, pending);
+      const fresh = get().tabs.find((t) => t.id === tab.id);
+      if (!fresh) return report;
+      const next = fresh.comments.map((c) => {
+        const link = linked.get(c.id);
+        return link ? { ...c, github: link } : c;
+      });
+      const pr: GithubPr = { ...tab.pr, headSha };
+      patchTab(set, tab.id, () => ({ comments: next, pr }));
+      persistComments(fresh.doc, next, pr);
+      report.pushed = linked.size;
+      report.summarized = summarized.length;
+      return report;
+    } finally {
+      set({ githubBusy: false });
+    }
   },
 
   setMode(mode) {

@@ -1,0 +1,20 @@
+name: hyper-markdown-infra
+description: GitHub App + repository wiring for hyper-markdown's pull-request integration
+runtime:
+  name: nodejs
+  options:
+    packagemanager: pnpm
+main: index.ts
+config:
+  repoOwner:
+    description: GitHub user or organisation that owns the hyper-markdown repository
+    default: chmelevskij
+  repoName:
+    description: Repository that receives the HMD_GITHUB_CLIENT_ID Actions variable
+    default: hyper-markdown
+  appName:
+    description: Display name of the GitHub App (must be unique on github.com)
+    default: hyper-markdown
+  organization:
+    description: Register the app under this organisation instead of the personal account
+    default: ""

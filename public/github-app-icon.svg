@@ -1,0 +1,17 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- GitHub App logo. Same mark as app-icon.svg, but full-bleed: GitHub crops
+       logos to a square and shows them in a rounded avatar, so the charcoal tile
+       fills the canvas and the badge background colour is set to #161616. -->
+  <rect width="1024" height="1024" fill="#161616"/>
+
+  <!-- The mark is centred and scaled to ~60% of the canvas width, matching the
+       optical weight of the desktop icon inside its own tile. -->
+  <g transform="translate(83.5 243) scale(4.2)">
+    <!-- Markdown "M" in paper -->
+    <path fill="#fafaf8" d="M30 98V30h20l20 25 20-25h20v68H90V59L70 84 50 59v39H30z"/>
+    <!-- Hyper lightning bolt in cobalt -->
+    <g transform="translate(116.2 23.2) scale(3.4)">
+      <path fill="#4070e5" d="M7 2v11h3v9l7-12h-4l4-8z"/>
+    </g>
+  </g>
+</svg>

@@ -73,7 +73,7 @@ BREAKING CHANGE: what consumers must do differently
 Rules: header ≤ 72 chars, imperative mood, lowercase subject, no trailing
 period, blank line before the body. Scope is optional and lowercase — the area
 touched: `mermaid`, `comments`, `anchors`, `store`, `export`, `tabs`, `theme`,
-`cli`, `tauri`, `ci`. A `!` after the type (or a `BREAKING CHANGE:` footer)
+`cli`, `tauri`, `ci`, `github`, `infra`. A `!` after the type (or a `BREAKING CHANGE:` footer)
 marks a breaking change.
 
 Good:
@@ -151,6 +151,9 @@ See the Architecture section of [README.md](./README.md). Load-bearing pieces:
 - `src/lib/diagram.ts` — addressing parts *inside* a Mermaid SVG, anchored to
   mermaid's own `data-et`/`data-id` markers so they survive re-renders.
 - `src/platform/index.ts` — the Tauri/browser split that keeps `pnpm dev` usable.
+- `src/lib/github.ts` + `src-tauri/src/github.rs` — PR review-thread sync. Rust owns
+  the token (device flow, keychain) and proxies API calls; TypeScript owns the mapping
+  between review threads and comments. `infra/` (Pulumi) provisions the GitHub App.
 
 Two React gotchas this codebase has already been bitten by, both worth
 remembering before touching `Mermaid.tsx` or `MdxRenderer.tsx`:

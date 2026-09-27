@@ -77,6 +77,7 @@ jobs:
             librsvg2-dev \
             libxdo-dev \
             libssl-dev \
+            libdbus-1-dev \
             build-essential \
             curl wget file patchelf
 
@@ -101,6 +102,8 @@ jobs:
       - uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GitHub App client id for device-flow sign-in; set by infra/ (Pulumi).
+          VITE_GITHUB_CLIENT_ID: ${{ vars.HMD_GITHUB_CLIENT_ID }}
         with:
           # Upload into the release release-please just created, rather than
           # creating a second one.
