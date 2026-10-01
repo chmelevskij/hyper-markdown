@@ -13,16 +13,13 @@ import { activeComments, activeTab, useStore } from "../store/useStore";
 import { hashSource } from "../lib/changes";
 import { LINE_KINDS, partAt, resolvePart } from "../lib/diagram";
 import { uid } from "../lib/id";
+import { mermaidConfig } from "../lib/mermaidTheme";
 import type { DiagramPart } from "../types";
 
 let initialized = false;
 async function ensureMermaid(mode: "light" | "dark") {
   const mermaid = (await import("mermaid")).default;
-  mermaid.initialize({
-    startOnLoad: false,
-    securityLevel: "strict",
-    theme: mode === "dark" ? "dark" : "neutral",
-  });
+  mermaid.initialize(mermaidConfig(mode));
   initialized = true;
   return mermaid;
 }
