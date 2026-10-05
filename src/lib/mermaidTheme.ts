@@ -21,6 +21,8 @@ interface Palette {
   borderStrong: string;
   accent: string;
   accentFg: string;
+  /** Shape fill: a cobalt wash so nodes lift off the figure background. */
+  fill: string;
   /** Categorical scale: ochre, sage, slate, dusk rose, heather, cobalt. */
   scale: string[];
 }
@@ -34,7 +36,8 @@ const LIGHT: Palette = {
   borderStrong: "#161616",
   accent: "#2255d4",
   accentFg: "#ffffff",
-  scale: ["#d9b56a", "#9bb5a9", "#98adc4", "#c49aa5", "#aba5c4", "#7d9ae6"],
+  fill: "#e6edfc",
+  scale: ["#e6b04f", "#6fb497", "#6f9ad6", "#df8197", "#a08fe0", "#6f93ec"],
 };
 
 const DARK: Palette = {
@@ -46,7 +49,8 @@ const DARK: Palette = {
   borderStrong: "#e9e9e6",
   accent: "#7da3f5",
   accentFg: "#0f0f0e",
-  scale: ["#8a6a2a", "#4b6a5c", "#4a5f78", "#7a4e5a", "#5c5478", "#3a5bb0"],
+  fill: "#1c2842",
+  scale: ["#a87b22", "#3d8566", "#3f6fae", "#a8475e", "#6c58b0", "#3d63d6"],
 };
 
 const FONT =
@@ -63,7 +67,7 @@ export function mermaidConfig(mode: Mode): MermaidConfig {
     fontSize: "14px",
 
     // Shapes: quiet fills, ink outlines, body text in the foreground colour.
-    primaryColor: p.surface2,
+    primaryColor: p.fill,
     primaryTextColor: p.fg,
     primaryBorderColor: p.borderStrong,
     secondaryColor: p.bg,
@@ -72,8 +76,8 @@ export function mermaidConfig(mode: Mode): MermaidConfig {
     tertiaryColor: p.surface2,
     tertiaryTextColor: p.fg,
     tertiaryBorderColor: p.border,
-    mainBkg: p.surface2,
-    nodeBkg: p.surface2,
+    mainBkg: p.fill,
+    nodeBkg: p.fill,
     nodeBorder: p.borderStrong,
     nodeTextColor: p.fg,
     textColor: p.fg,
@@ -82,8 +86,8 @@ export function mermaidConfig(mode: Mode): MermaidConfig {
     arrowheadColor: p.borderStrong,
     defaultLinkColor: p.borderStrong,
     edgeLabelBackground: p.bg,
-    clusterBkg: p.bg,
-    clusterBorder: p.border,
+    clusterBkg: p.surface2,
+    clusterBorder: p.muted,
 
     // Notes: paper-on-paper, not post-it yellow.
     noteBkgColor: p.bg,
@@ -91,13 +95,13 @@ export function mermaidConfig(mode: Mode): MermaidConfig {
     noteTextColor: p.fg,
 
     // Sequence diagrams.
-    actorBkg: p.surface2,
+    actorBkg: p.fill,
     actorBorder: p.borderStrong,
     actorTextColor: p.fg,
     actorLineColor: p.muted,
     signalColor: p.borderStrong,
     signalTextColor: p.fg,
-    labelBoxBkgColor: p.surface2,
+    labelBoxBkgColor: p.fill,
     labelBoxBorderColor: p.borderStrong,
     labelTextColor: p.fg,
     loopTextColor: p.fg,
@@ -107,13 +111,13 @@ export function mermaidConfig(mode: Mode): MermaidConfig {
 
     // State diagrams.
     labelColor: p.fg,
-    stateBkg: p.surface2,
+    stateBkg: p.fill,
     stateLabelColor: p.fg,
     transitionColor: p.borderStrong,
     transitionLabelColor: p.fg,
     altBackground: p.bg,
     compositeBackground: p.bg,
-    compositeTitleBackground: p.surface2,
+    compositeTitleBackground: p.fill,
     compositeBorder: p.border,
     innerEndBackground: p.borderStrong,
     specialStateColor: p.borderStrong,
@@ -124,7 +128,7 @@ export function mermaidConfig(mode: Mode): MermaidConfig {
     classText: p.fg,
     attributeBackgroundColorOdd: p.bg,
     attributeBackgroundColorEven: p.surface2,
-    requirementBackground: p.surface2,
+    requirementBackground: p.fill,
     requirementBorderColor: p.borderStrong,
     requirementTextColor: p.fg,
     relationColor: p.borderStrong,
@@ -138,7 +142,7 @@ export function mermaidConfig(mode: Mode): MermaidConfig {
     excludeBkgColor: p.surface2,
     gridColor: p.border,
     todayLineColor: p.accent,
-    taskBkgColor: p.surface2,
+    taskBkgColor: p.fill,
     taskBorderColor: p.borderStrong,
     taskTextColor: p.fg,
     taskTextDarkColor: p.fg,
@@ -192,7 +196,7 @@ export function mermaidConfig(mode: Mode): MermaidConfig {
     // Journey / mindmap / architecture.
     fillType0: c5, fillType1: c0, fillType2: c1, fillType3: c2,
     fillType4: c3, fillType5: c4, fillType6: p.muted, fillType7: p.border,
-    personBkg: p.surface2,
+    personBkg: p.fill,
     personBorder: p.borderStrong,
     archEdgeColor: p.borderStrong,
     archEdgeArrowColor: p.borderStrong,
@@ -205,13 +209,15 @@ export function mermaidConfig(mode: Mode): MermaidConfig {
     theme: "base",
     themeVariables,
     fontFamily: FONT,
-    // Hairline strokes to match the chrome; the stock theme draws 2px.
+    // Firm outlines and edges, medium-weight labels: diagrams should read at a glance.
     themeCSS: `
       .node rect, .node circle, .node ellipse, .node polygon, .node path,
-      .cluster rect, .actor, .classGroup rect, .er.entityBox,
-      g.stateGroup rect, .statediagram-state rect, .task { stroke-width: 1px; }
-      .edgePath .path, .flowchart-link, .transition, .relation, .messageLine0, .messageLine1 { stroke-width: 1.25px; }
-      .cluster rect { stroke-dasharray: 3 3; }
+      .actor, .classGroup rect, .er.entityBox,
+      g.stateGroup rect, .statediagram-state rect, .task { stroke-width: 1.5px; }
+      .edgePath .path, .flowchart-link, .transition, .relation,
+      .messageLine0, .messageLine1 { stroke-width: 1.75px; }
+      .cluster rect { stroke-width: 1px; stroke-dasharray: 4 3; }
+      .nodeLabel, .actor tspan, .stateLabel, .classTitle, .cluster-label { font-weight: 500; }
       .edgeLabel, .edgeLabel p { line-height: 1.3; }
     `,
   };
