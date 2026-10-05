@@ -13,16 +13,13 @@ import { activeComments, activeTab, useStore } from "../store/useStore";
 import { hashSource } from "../lib/changes";
 import { LINE_KINDS, partAt, resolvePart } from "../lib/diagram";
 import { uid } from "../lib/id";
+import { mermaidConfig } from "../lib/mermaidTheme";
 import type { DiagramPart } from "../types";
 
 let initialized = false;
 async function ensureMermaid(mode: "light" | "dark") {
   const mermaid = (await import("mermaid")).default;
-  mermaid.initialize({
-    startOnLoad: false,
-    securityLevel: "strict",
-    theme: mode === "dark" ? "dark" : "neutral",
-  });
+  mermaid.initialize(mermaidConfig(mode));
   initialized = true;
   return mermaid;
 }
@@ -536,7 +533,6 @@ export default function Mermaid({ code, srcStart, srcEnd, onPickPart }: Props) {
   const [svg, setSvg] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
-  const idRef = useRef(`mmd-${uid().slice(0, 8)}`);
   // Identity of this fenced block within the document — its start line where the
   // renderer stamped one, else a hash of the diagram source.
   const block = useMemo(
@@ -551,7 +547,13 @@ export default function Mermaid({ code, srcStart, srcEnd, onPickPart }: Props) {
       try {
         const mermaid = await ensureMermaid(mode);
         if (!initialized) return;
-        const { svg } = await mermaid.render(idRef.current, code);
+        // A fresh id per render call, never per component: mermaid starts every
+        // render by removing whatever element already carries that id from the
+        // document. Two renders sharing an id (StrictMode's double effect, a
+        // theme flip) would otherwise let the later one tear the earlier SVG out
+        // of the figure — and when both produce the same markup React bails
+        // out of the state update, leaving the figure blank.
+        const { svg } = await mermaid.render(`mmd-${uid().slice(0, 8)}`, code);
         if (!cancelled) setSvg(svg);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));

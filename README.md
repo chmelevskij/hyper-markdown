@@ -31,7 +31,7 @@ Builds are **unsigned**, so the OS objects the first time:
 - **Markdown & MDX** — runtime-compiled MDX (JSX + expressions), GFM (tables, task lists,
   strikethrough), frontmatter, and math (`$…$`, via KaTeX).
 - **Mermaid diagrams** — fenced ` ```mermaid ` blocks render to inline SVG, theme-aware
-  (neutral in light mode, dark in dark mode), with a readable error box when one fails to
+  (the app's own palette in both modes: ink outlines, paper or soot fills, cobalt for emphasis), with a readable error box when one fails to
   parse.
 - **Fullscreen diagram viewer** — the **⤢** button on a diagram opens a pan/zoom stage;
   drag to pan, and the wheel zooms toward the cursor (there are zoom/reset buttons too).
